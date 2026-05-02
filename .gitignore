@@ -1,0 +1,60 @@
+node_modules/
+.env
+.env.local
+.env.*.local
+config.json
+mockup-positions.json
+
+# Personal data — generated content + browser sessions
+designs/
+mockups/
+output/
+uploads/
+templates/
+data/
+logs/
+reports/
+server.log
+server-error.log
+mockup-debug.log
+
+# Personal scheduling (launchd plists) and shop-specific snapshots
+*.plist
+etsy-rules/11-*/
+etsy-rules/_x-monitoring/
+etsy-projects/
+
+# Tag Lab personal data
+tag-lab/data/
+tag-lab/output/
+
+# Root one-shot operational scripts (per CLAUDE.md: disposable, contain shop-specific IDs)
+# Exclude all root .js by default, then whitelist canonical pipeline entry points below.
+/*.js
+!/server.js
+!/create.js
+!/ecosystem.config.js
+!/launch-browser.js
+
+# Backups
+*.backup*
+.js-backup*
+*.bak
+
+# IDE / Claude
+.claude/
+.cursor/
+.vscode/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Static brand assets in /public (not referenced in code, likely user's brand graphics)
+public/*.jpg
+public/*.jpeg
+public/*.png
+public/*.webp
+
+# Misc
+dfssdf
