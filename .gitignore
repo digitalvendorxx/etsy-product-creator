@@ -60,9 +60,11 @@ public/*.webp
 /start.sh
 /start-browser.sh
 /launch.sh
+/stop.sh
 /start.bat
 /start-browser.bat
 /launch.bat
+/stop.bat
 
 # Misc
 dfssdf

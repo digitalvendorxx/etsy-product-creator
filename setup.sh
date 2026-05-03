@@ -158,6 +158,22 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
 mkdir -p logs
 
+# 0. Otomatik guncelleme (sessiz, basarisiz olursa devam et)
+if [ -d .git ] && command -v git >/dev/null 2>&1; then
+  CURRENT="$(git rev-parse HEAD 2>/dev/null)"
+  if git fetch --quiet origin main 2>/dev/null; then
+    LOCAL_CHANGES="$(git status --porcelain 2>/dev/null)"
+    if [ -z "$LOCAL_CHANGES" ]; then
+      git pull --ff-only --quiet origin main 2>/dev/null || true
+      NEW="$(git rev-parse HEAD 2>/dev/null)"
+      if [ "$CURRENT" != "$NEW" ]; then
+        echo "[update] guncelleme alindi, npm install..."
+        npm install --silent --no-fund --no-audit 2>/dev/null || true
+      fi
+    fi
+  fi
+fi
+
 # 1. CDP browser (port 9333)
 if ! lsof -i :9333 >/dev/null 2>&1; then
   nohup bash "$ROOT/start-browser.sh" > "$ROOT/logs/browser.log" 2>&1 &
@@ -181,6 +197,20 @@ elif command -v xdg-open >/dev/null 2>&1; then
 fi
 EOF
 chmod +x launch.sh
+
+# Stop scripti (server + browser kapat)
+cat > stop.sh <<'EOF'
+#!/usr/bin/env bash
+echo "Server ve CDP browser kapatiliyor..."
+# Server (port 3000)
+PID3000=$(lsof -ti :3000 2>/dev/null)
+[ -n "$PID3000" ] && kill $PID3000 && echo "  server (PID $PID3000) kapatildi"
+# CDP browser (port 9333)
+PID9333=$(lsof -ti :9333 2>/dev/null)
+[ -n "$PID9333" ] && kill $PID9333 && echo "  CDP browser (PID $PID9333) kapatildi"
+echo "Bitti."
+EOF
+chmod +x stop.sh
 
 # 11. Masaustu kisayolu
 if [ "$OS" = "Darwin" ]; then

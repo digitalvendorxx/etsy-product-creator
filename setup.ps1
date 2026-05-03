@@ -135,6 +135,21 @@ npm start
 cd /d "%~dp0"
 if not exist logs mkdir logs
 
+REM Otomatik guncelleme (sessiz)
+if exist .git (
+  for /f %%H in ('git rev-parse HEAD 2^>nul') do set CURRENT=%%H
+  git fetch --quiet origin main >nul 2>&1
+  for /f %%S in ('git status --porcelain 2^>nul ^| find /c /v ""') do set DIRTY=%%S
+  if "%DIRTY%"=="0" (
+    git pull --ff-only --quiet origin main >nul 2>&1
+    for /f %%N in ('git rev-parse HEAD 2^>nul') do set NEW=%%N
+    if not "%CURRENT%"=="%NEW%" (
+      echo [update] guncelleme alindi, npm install...
+      call npm install --silent --no-fund --no-audit >nul 2>&1
+    )
+  )
+)
+
 REM CDP browser (port 9333) - acik degilse baslat
 netstat -an | find ":9333 " | find "LISTENING" >nul
 if errorlevel 1 (
@@ -156,6 +171,15 @@ for /L %%i in (1,1,30) do (
 :ready
 start http://localhost:3000
 "@ | Set-Content -Encoding ASCII (Join-Path $Root "launch.bat")
+
+# Stop scripti
+@"
+@echo off
+echo Server ve CDP browser kapatiliyor...
+for /f ""tokens=5"" %%a in ('netstat -ano ^| find "":3000 "" ^| find ""LISTENING""') do taskkill /F /PID %%a 2>nul
+for /f ""tokens=5"" %%a in ('netstat -ano ^| find "":9333 "" ^| find ""LISTENING""') do taskkill /F /PID %%a 2>nul
+echo Bitti.
+"@ | Set-Content -Encoding ASCII (Join-Path $Root "stop.bat")
 
 # 12. Masaustu kisayolu (.lnk)
 try {
