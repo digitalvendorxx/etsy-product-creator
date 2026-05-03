@@ -129,6 +129,50 @@ cd /d "%~dp0"
 npm start
 "@ | Set-Content -Encoding ASCII (Join-Path $Root "start.bat")
 
+# 11. Birlesik launcher
+@"
+@echo off
+cd /d "%~dp0"
+if not exist logs mkdir logs
+
+REM CDP browser (port 9333) - acik degilse baslat
+netstat -an | find ":9333 " | find "LISTENING" >nul
+if errorlevel 1 (
+  start "Etsy CDP Browser" /MIN cmd /c "start-browser.bat ^> logs\browser.log 2^>^&1"
+)
+
+REM Server (port 3000) - acik degilse baslat
+netstat -an | find ":3000 " | find "LISTENING" >nul
+if errorlevel 1 (
+  start "Etsy Server" /MIN cmd /c "start.bat ^> logs\server.log 2^>^&1"
+)
+
+REM Server hazir olunca tarayici
+for /L %%i in (1,1,30) do (
+  timeout /t 1 /nobreak >nul
+  curl -s -o nul http://localhost:3000 >nul 2>&1
+  if not errorlevel 1 goto :ready
+)
+:ready
+start http://localhost:3000
+"@ | Set-Content -Encoding ASCII (Join-Path $Root "launch.bat")
+
+# 12. Masaustu kisayolu (.lnk)
+try {
+  $desktop = [Environment]::GetFolderPath("Desktop")
+  $lnkPath = Join-Path $desktop "Etsy Creator.lnk"
+  $wsh = New-Object -ComObject WScript.Shell
+  $lnk = $wsh.CreateShortcut($lnkPath)
+  $lnk.TargetPath = (Join-Path $Root "launch.bat")
+  $lnk.WorkingDirectory = $Root
+  $lnk.WindowStyle = 7   # minimized
+  $lnk.Description = "Flowiqa Etsy Product Creator"
+  $lnk.Save()
+  Ok "Masaustu: 'Etsy Creator.lnk' (cift tik ile baslat)"
+} catch {
+  Warn "Masaustu kisayolu olusturulamadi: $_"
+}
+
 Write-Host ""
 Write-Host "=== KURULUM TAMAM ===" -ForegroundColor Green
 Write-Host ""
@@ -137,6 +181,10 @@ Write-Host "  1. .env ac, doldur:"
 Write-Host "       GEMINI_API_KEY=...        (zorunlu)"
 Write-Host "       OPENROUTER_API_KEY=...    (zorunlu)"
 Write-Host "  2. config.json -> templateListingId alanini doldur"
-Write-Host "  3. start-browser.bat  (etsy + pinterest login, 1 kere)"
-Write-Host "  4. start.bat          (server :3000)"
-Write-Host "  5. http://localhost:3000"
+Write-Host ""
+Write-Host "BASLATMA (3 yoldan biri):"
+Write-Host "  A) Masaustunde 'Etsy Creator' ikonuna cift tik (onerilen)"
+Write-Host "  B) launch.bat  (tek komut, hepsi otomatik)"
+Write-Host "  C) Eski yol:  start-browser.bat + start.bat"
+Write-Host ""
+Write-Host "ILK ACILISTA: Acilan Chrome penceresinde etsy.com + pinterest.com login ol."

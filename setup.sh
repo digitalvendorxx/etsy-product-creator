@@ -151,6 +151,80 @@ npm start
 EOF
 chmod +x start.sh
 
+# 10. Birlesik launcher (browser + server + tarayici sekmesi tek komut)
+cat > launch.sh <<'EOF'
+#!/usr/bin/env bash
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+cd "$ROOT"
+mkdir -p logs
+
+# 1. CDP browser (port 9333)
+if ! lsof -i :9333 >/dev/null 2>&1; then
+  nohup bash "$ROOT/start-browser.sh" > "$ROOT/logs/browser.log" 2>&1 &
+fi
+
+# 2. Server (port 3000)
+if ! lsof -i :3000 >/dev/null 2>&1; then
+  nohup bash "$ROOT/start.sh" > "$ROOT/logs/server.log" 2>&1 &
+fi
+
+# 3. Server hazir olunca tarayici
+for i in $(seq 1 30); do
+  curl -s -o /dev/null http://localhost:3000 && break
+  sleep 0.5
+done
+
+if command -v open >/dev/null 2>&1; then
+  open "http://localhost:3000"
+elif command -v xdg-open >/dev/null 2>&1; then
+  xdg-open "http://localhost:3000"
+fi
+EOF
+chmod +x launch.sh
+
+# 11. Masaustu kisayolu
+if [ "$OS" = "Darwin" ]; then
+  APP_DIR="$HOME/Desktop/Etsy Creator.app"
+  rm -rf "$APP_DIR"
+  mkdir -p "$APP_DIR/Contents/MacOS"
+  cat > "$APP_DIR/Contents/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key><string>Etsy Creator</string>
+  <key>CFBundleDisplayName</key><string>Etsy Creator</string>
+  <key>CFBundleExecutable</key><string>launcher</string>
+  <key>CFBundleIdentifier</key><string>com.flowiqa.etsy-creator</string>
+  <key>CFBundleVersion</key><string>1.0</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>LSUIElement</key><true/>
+</dict>
+</plist>
+PLIST
+  cat > "$APP_DIR/Contents/MacOS/launcher" <<LAUNCHER
+#!/usr/bin/env bash
+exec "$ROOT/launch.sh"
+LAUNCHER
+  chmod +x "$APP_DIR/Contents/MacOS/launcher"
+  echo "   Masaustu: 'Etsy Creator.app' (cift tik ile baslat)"
+
+elif [ "$OS" = "Linux" ]; then
+  DESKTOP="$HOME/Desktop"
+  [ -d "$DESKTOP" ] || DESKTOP="$HOME"
+  cat > "$DESKTOP/etsy-creator.desktop" <<DESKTOP_FILE
+[Desktop Entry]
+Type=Application
+Name=Etsy Creator
+Comment=Flowiqa Etsy Product Creator
+Exec=bash -c "$ROOT/launch.sh"
+Terminal=false
+Categories=Office;
+DESKTOP_FILE
+  chmod +x "$DESKTOP/etsy-creator.desktop"
+  echo "   Masaustu: 'etsy-creator.desktop' (cift tik ile baslat)"
+fi
+
 cat <<EOF
 
 === KURULUM TAMAM ===
@@ -162,12 +236,13 @@ KALAN ADIMLAR:
 
   2. config.json -> templateListingId alanina kendi sablon Etsy listing ID gir.
 
-  3. CDP browser baslat (etsy + pinterest login icin):
-       ./start-browser.sh
-     Acilan pencerede etsy.com + pinterest.com login ol. Pencere acik kalsin.
+BASLATMA (3 yoldan biri):
+  A) Masaustunde 'Etsy Creator' ikonuna cift tik (onerilen)
+  B) Terminal:  ./launch.sh
+  C) Eski yol:  ./start-browser.sh + ./start.sh (ayri terminallerde)
 
-  4. Yeni terminalde server:
-       ./start.sh
+ILK ACILISTA: Acilan Chrome penceresinde etsy.com + pinterest.com login ol.
+Bu pencere arka planda acik kalmali.
 
-  5. Tarayicida: http://localhost:3000
+Sonra: http://localhost:3000
 EOF
