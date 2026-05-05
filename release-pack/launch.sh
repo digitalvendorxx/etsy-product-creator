@@ -19,27 +19,29 @@ warn() { echo -e "${RED}   $*${NC}"; }
 CDP_PORT=$(node -e "try { console.log(JSON.parse(require('fs').readFileSync('config.json')).cdpPort||9333) } catch { console.log(9333) }" 2>/dev/null)
 SERVER_PORT="${PORT:-3001}"
 
-# 1. Update check (flowiqa.com tarball)
+# 1. Update check (release branch)
 say "Guncelleme kontrol..."
-LOCAL_VERSION=$(cat data/.version 2>/dev/null || echo "")
-REMOTE_VERSION=$(curl -sf --max-time 5 "https://www.flowiqa.com/api/version?app=etsy-product-creator" 2>/dev/null | node -e "try { let d=''; process.stdin.on('data', c=>d+=c); process.stdin.on('end', ()=>{ try { console.log(JSON.parse(d).version||'') } catch { console.log('') } }) }" 2>/dev/null || echo "")
-
-if [ -n "$REMOTE_VERSION" ] && [ "$LOCAL_VERSION" != "$REMOTE_VERSION" ]; then
-  say "Yeni surum mevcut: $LOCAL_VERSION -> $REMOTE_VERSION, guncelleniyor..."
-  KEY=$(node -e "try { console.log(JSON.parse(require('fs').readFileSync('data/license.json')).payload.key) } catch { console.log('') }" 2>/dev/null)
-  if [ -z "$KEY" ]; then
-    warn "Lisans cache yok, guncelleme atlandi (/activate'ten sonra tekrar dene)"
-  else
-    # Re-run installer with stored key — atomik replace, .env/config korunur
-    if curl -fsSL "https://www.flowiqa.com/install/etsy-product-creator.sh" | TARGET="$(pwd)" bash -s "$KEY" >/tmp/epc-update.log 2>&1; then
-      echo "$REMOTE_VERSION" > data/.version
-      ok "Guncelleme basarili: $REMOTE_VERSION"
+if git rev-parse --git-dir >/dev/null 2>&1; then
+  BRANCH=$(git rev-parse --abbrev-ref HEAD)
+  git fetch --quiet origin "$BRANCH" --tags 2>/dev/null || true
+  LOCAL=$(git rev-parse HEAD 2>/dev/null || echo "")
+  REMOTE=$(git rev-parse "origin/$BRANCH" 2>/dev/null || echo "$LOCAL")
+  if [ -n "$LOCAL" ] && [ -n "$REMOTE" ] && [ "$LOCAL" != "$REMOTE" ]; then
+    say "Yeni surum mevcut ($BRANCH), guncelleniyor..."
+    PREV="$LOCAL"
+    if git pull --ff-only origin "$BRANCH" >/dev/null 2>&1 \
+       && npm install --silent --no-audit --no-fund >/dev/null 2>&1 \
+       && node --check lib/license.js >/dev/null 2>&1 \
+       && node --check server.js >/dev/null 2>&1; then
+      ok "Guncelleme basarili"
     else
-      warn "Guncelleme basarisiz, eski surum ile devam (/tmp/epc-update.log incele)"
+      warn "Guncelleme bozuk, rollback..."
+      git reset --hard "$PREV" >/dev/null
+      npm install --silent --no-audit --no-fund >/dev/null 2>&1 || true
     fi
+  else
+    ok "Guncel"
   fi
-else
-  ok "Guncel${LOCAL_VERSION:+ ($LOCAL_VERSION)}"
 fi
 
 # 2. CDP browser

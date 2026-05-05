@@ -1,0 +1,13 @@
+{
+  "mockup": {
+    "x": 280,
+    "y": 350,
+    "width": 400,
+    "height": 500
+  },
+  "keepPhotoIndexes": [],
+  "keepPhotoCount": 6,
+  "operaPath": "/Applications/Opera.app/Contents/MacOS/Opera",
+  "cdpPort": 9333,
+  "templateListingId": "REPLACE_WITH_YOUR_ETSY_TEMPLATE_LISTING_ID"
+}

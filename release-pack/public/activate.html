@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lisans Aktivasyonu - Etsy Product Creator</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; font-family: -apple-system,Segoe UI,Roboto,sans-serif;
+    background: #0b0b0d; color: #e7e7ea;
+    display: grid; place-items: center; padding: 32px;
+  }
+  .card {
+    width: 100%; max-width: 460px; background: #16161a; border: 1px solid #2a2a31;
+    border-radius: 14px; padding: 32px; box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  }
+  h1 { margin: 0 0 4px; font-size: 22px; }
+  .sub { color: #8e8e96; font-size: 13px; margin-bottom: 24px; }
+  label { display: block; font-size: 12px; color: #b0b0b8; margin: 16px 0 6px; text-transform: uppercase; letter-spacing: .04em; }
+  input {
+    width: 100%; padding: 12px 14px; border-radius: 8px; border: 1px solid #2a2a31;
+    background: #0b0b0d; color: #e7e7ea; font-size: 14px; font-family: inherit;
+  }
+  input:focus { outline: none; border-color: #6c5ce7; }
+  button {
+    width: 100%; margin-top: 24px; padding: 12px 14px; border-radius: 8px; border: none;
+    background: #6c5ce7; color: white; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .msg { margin-top: 16px; padding: 12px 14px; border-radius: 8px; font-size: 13px; line-height: 1.5; }
+  .msg.err { background: #2a1417; border: 1px solid #5a1f26; color: #ff8a8a; }
+  .msg.ok  { background: #14271b; border: 1px solid #1f5a2a; color: #8aff9a; }
+  .meta { margin-top: 24px; padding-top: 16px; border-top: 1px solid #2a2a31; font-size: 12px; color: #6e6e76; }
+  .meta b { color: #b0b0b8; font-weight: 500; }
+  a { color: #8aa9ff; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Lisans Aktivasyonu</h1>
+  <div class="sub">Etsy Product Creator - flowiqa.com lisansi gerekli.</div>
+
+  <form id="form" autocomplete="off">
+    <label for="email">E-posta</label>
+    <input id="email" type="email" required placeholder="ornek@firma.com">
+
+    <label for="key">Lisans Anahtari</label>
+    <input id="key" type="text" required placeholder="FLOW-XXXX-XXXX-XXXX-XXXX" autocapitalize="characters">
+
+    <button type="submit" id="submit">Aktive Et</button>
+  </form>
+
+  <div id="msg"></div>
+
+  <div class="meta">
+    Bu Makine ID: <b id="hwid">-</b><br>
+    Anahtarin yok mu? <a href="https://flowiqa.com/billing" target="_blank">flowiqa.com/billing</a>
+  </div>
+</div>
+
+<script>
+const form = document.getElementById('form');
+const submit = document.getElementById('submit');
+const msg = document.getElementById('msg');
+const hwidEl = document.getElementById('hwid');
+
+const errMap = {
+  invalid_key: 'Gecersiz lisans anahtari.',
+  hwid_mismatch: 'Bu anahtar baska bir makineye bagli. flowiqa.com hesabindan eski makineyi cikarmalisin.',
+  expired: 'Lisans suresi dolmus.',
+  revoked: 'Lisans iptal edilmis. Destek ile iletisime gec.',
+  email_and_key_required: 'E-posta ve anahtar zorunlu.',
+  invalid_signature: 'Sunucu yaniti dogrulanamadi (guvenlik). Tekrar dene.',
+  invalid_server_response: 'Sunucu yaniti hatali. Tekrar dene.',
+  network_error: 'Sunucuya ulasilamiyor. Internet baglantini kontrol et.',
+};
+
+function show(kind, text) {
+  msg.className = 'msg ' + kind;
+  msg.textContent = text;
+}
+
+async function loadStatus() {
+  try {
+    const r = await fetch('/api/license/status');
+    const j = await r.json();
+    hwidEl.textContent = j.hwid || '-';
+    if (j.valid) {
+      show('ok', 'Lisans zaten aktif (' + (j.plan || 'pro') + '). Yonlendiriliyor...');
+      setTimeout(() => location.href = '/', 1200);
+    }
+  } catch {}
+}
+loadStatus();
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  submit.disabled = true;
+  msg.textContent = '';
+  const email = document.getElementById('email').value.trim();
+  const key = document.getElementById('key').value.trim();
+  try {
+    const r = await fetch('/api/license/activate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, key }),
+    });
+    const j = await r.json();
+    if (r.ok) {
+      show('ok', 'Aktivasyon basarili. Plan: ' + (j.plan || 'pro') + '. Yonlendiriliyor...');
+      setTimeout(() => location.href = '/', 1200);
+    } else {
+      const code = j.error || 'unknown';
+      show('err', errMap[code] || ('Hata: ' + code));
+      submit.disabled = false;
+    }
+  } catch (err) {
+    show('err', errMap.network_error);
+    submit.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

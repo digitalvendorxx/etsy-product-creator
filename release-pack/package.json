@@ -5,8 +5,6 @@
   "main": "create.js",
   "scripts": {
     "start": "node server.js",
-    "build:dist": "node scripts/build.js",
-    "start:dist": "node dist/server.js",
     "create": "node create.js",
     "browser": "node launch-browser.js",
     "dev": "node launch-browser.js && node server.js",

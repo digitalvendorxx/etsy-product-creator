@@ -7,35 +7,27 @@ cd /d "%~dp0"
 
 REM 1. Update check (release branch)
 echo ^>^> Guncelleme kontrol...
-REM flowiqa.com tarball auto-update (git pull yok artik)
-set LOCAL_VERSION=
-if exist data\.version (
-  set /p LOCAL_VERSION=<data\.version
-)
-
-set REMOTE_VERSION=
-for /f "tokens=*" %%v in ('node -e "fetch('https://www.flowiqa.com/api/version?app=etsy-product-creator').then(r=^>r.json()).then(j=^>console.log(j.version^|^|'')).catch(()=^>console.log(''))" 2^>nul') do set REMOTE_VERSION=%%v
-
-if "%REMOTE_VERSION%"=="" (
-  echo    Surum kontrol atlandi (offline?)
-) else if "%LOCAL_VERSION%"=="%REMOTE_VERSION%" (
-  echo    Guncel %LOCAL_VERSION%
-) else (
-  echo    Yeni surum: %LOCAL_VERSION% -^> %REMOTE_VERSION%, guncelleniyor...
-  set KEY=
-  for /f "tokens=*" %%k in ('node -e "try{console.log(JSON.parse(require('fs').readFileSync('data/license.json')).payload.key)}catch{console.log('')}" 2^>nul') do set KEY=%%k
-  if "%KEY%"=="" (
-    echo    Lisans cache yok, guncelleme atlandi
-  ) else (
-    set "TARGET=%CD%"
-    set "LICENSE_KEY=%KEY%"
-    powershell -ExecutionPolicy Bypass -Command "iwr -useb https://www.flowiqa.com/install/etsy-product-creator.ps1 | iex" >%TEMP%\epc-update.log 2>&1
-    if errorlevel 1 (
-      echo    Guncelleme basarisiz, eski surum ile devam (%%TEMP%%\epc-update.log incele)
+git rev-parse --git-dir >nul 2>&1
+if %ERRORLEVEL%==0 (
+  for /f %%b in ('git rev-parse --abbrev-ref HEAD') do set BRANCH=%%b
+  git fetch --quiet origin %BRANCH% --tags 2>nul
+  for /f %%i in ('git rev-parse HEAD') do set LOCAL=%%i
+  for /f %%i in ('git rev-parse origin/%BRANCH% 2^>nul') do set REMOTE=%%i
+  if not "%LOCAL%"=="%REMOTE%" (
+    echo    Yeni surum mevcut, guncelleniyor...
+    set PREV=%LOCAL%
+    git pull --ff-only origin %BRANCH% >nul 2>&1
+    call npm install --silent --no-audit --no-fund >nul 2>&1
+    node --check lib\license.js >nul 2>&1
+    if %ERRORLEVEL% neq 0 (
+      echo    Guncelleme bozuk, rollback...
+      git reset --hard %PREV% >nul
+      call npm install --silent --no-audit --no-fund >nul 2>&1
     ) else (
-      echo %REMOTE_VERSION%>data\.version
-      echo    Guncelleme basarili: %REMOTE_VERSION%
+      echo    Guncelleme basarili
     )
+  ) else (
+    echo    Guncel
   )
 )
 

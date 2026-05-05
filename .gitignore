@@ -1,4 +1,5 @@
 node_modules/
+dist/
 .env
 .env.local
 .env.*.local
@@ -58,3 +59,4 @@ public/*.webp
 
 # Misc
 dfssdf
+etsy-product-creator-*.tar.gz

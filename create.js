@@ -9,6 +9,8 @@ const { uploadToEtsy } = require('./lib/upload-etsy');
 const { pinToPinterest } = require('./lib/pin-to-pinterest');
 const { ensureLicenseOrExit } = require('./lib/license');
 
+const APP_ROOT = path.basename(__dirname) === 'dist' ? path.resolve(__dirname, '..') : __dirname;
+
 function parseArgs() {
   const args = process.argv.slice(2);
   const get = (flag) => {
@@ -53,7 +55,7 @@ async function main() {
 
   // Ensure directories exist
   ['designs', 'output'].forEach(dir => {
-    fs.mkdirSync(path.join(__dirname, dir), { recursive: true });
+    fs.mkdirSync(path.join(APP_ROOT, dir), { recursive: true });
   });
 
   console.log(`\n=== Etsy Product Creator ===`);

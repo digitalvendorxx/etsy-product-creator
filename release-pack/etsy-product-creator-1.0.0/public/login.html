@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Giris - Etsy Product Creator</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Instrument Sans', sans-serif;
+  background: #050506;
+  color: #d4d4d8;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.auth-container {
+  width: 100%;
+  max-width: 400px;
+  padding: 2rem;
+}
+.auth-logo {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+.auth-logo h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #6366f1, #818cf8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.auth-logo p {
+  color: #52525b;
+  font-size: 0.8rem;
+  margin-top: 0.3rem;
+}
+.auth-card {
+  background: #0e0e11;
+  border: 1px solid #1a1a1f;
+  border-radius: 12px;
+  padding: 1.75rem;
+}
+.auth-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 1.5rem;
+  background: #0a0a0d;
+  border-radius: 8px;
+  padding: 3px;
+}
+.auth-tab {
+  flex: 1;
+  padding: 0.5rem;
+  border: none;
+  background: transparent;
+  color: #52525b;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+.auth-tab.active {
+  background: #1a1a1f;
+  color: #fafafa;
+}
+.auth-field {
+  margin-bottom: 1rem;
+}
+.auth-field label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #a1a1aa;
+  margin-bottom: 0.35rem;
+}
+.auth-field input {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  background: #0a0a0d;
+  border: 1px solid #1a1a1f;
+  border-radius: 8px;
+  color: #d4d4d8;
+  font-family: inherit;
+  font-size: 0.82rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.auth-field input:focus {
+  border-color: #6366f1;
+}
+.auth-btn {
+  width: 100%;
+  padding: 0.65rem;
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 0.5rem;
+  transition: opacity 0.2s;
+}
+.auth-btn:hover { opacity: 0.9; }
+.auth-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.auth-error {
+  color: #ef4444;
+  font-size: 0.75rem;
+  margin-top: 0.5rem;
+  min-height: 1.2em;
+}
+.auth-field-name { display: none; }
+</style>
+</head>
+<body>
+<div class="auth-container">
+  <div class="auth-logo">
+    <h1>Etsy Product Creator</h1>
+    <p>AI destekli urun olusturma araci</p>
+  </div>
+  <div class="auth-card">
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="switchTab('login')">Giris Yap</button>
+      <button class="auth-tab" onclick="switchTab('signup')">Kayit Ol</button>
+    </div>
+
+    <form id="authForm" onsubmit="handleAuth(event)">
+      <div class="auth-field auth-field-name" id="nameField">
+        <label>Isim</label>
+        <input type="text" id="nameInput" placeholder="Adiniz">
+      </div>
+      <div class="auth-field">
+        <label>Email</label>
+        <input type="email" id="emailInput" placeholder="ornek@email.com" required>
+      </div>
+      <div class="auth-field">
+        <label>Sifre</label>
+        <input type="password" id="passwordInput" placeholder="En az 6 karakter" required minlength="6">
+      </div>
+      <button type="submit" class="auth-btn" id="authBtn">Giris Yap</button>
+      <div class="auth-error" id="authError"></div>
+    </form>
+  </div>
+</div>
+
+<script>
+let mode = 'login';
+
+function switchTab(m) {
+  mode = m;
+  document.querySelectorAll('.auth-tab').forEach((t, i) => {
+    t.classList.toggle('active', (i === 0 && m === 'login') || (i === 1 && m === 'signup'));
+  });
+  document.getElementById('nameField').style.display = m === 'signup' ? 'block' : 'none';
+  document.getElementById('authBtn').textContent = m === 'login' ? 'Giris Yap' : 'Kayit Ol';
+  document.getElementById('authError').textContent = '';
+}
+
+async function handleAuth(e) {
+  e.preventDefault();
+  const btn = document.getElementById('authBtn');
+  const err = document.getElementById('authError');
+  btn.disabled = true;
+  err.textContent = '';
+
+  const body = {
+    email: document.getElementById('emailInput').value,
+    password: document.getElementById('passwordInput').value,
+  };
+  if (mode === 'signup') body.name = document.getElementById('nameInput').value;
+
+  try {
+    const res = await fetch('/api/auth/' + mode, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Hata olustu');
+
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('user', JSON.stringify(data.user));
+    window.location.href = '/';
+  } catch (error) {
+    err.textContent = error.message;
+  }
+  btn.disabled = false;
+}
+
+// If already logged in, redirect
+if (localStorage.getItem('token')) {
+  window.location.href = '/';
+}
+</script>
+</body>
+</html>

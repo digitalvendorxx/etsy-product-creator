@@ -21,7 +21,8 @@ const { pinToPinterestWithCookies } = require('./lib/pin-to-pinterest-cookies');
 const { detectBrowser, detectAll } = require('./lib/browser-detect');
 const { execFile, spawn } = require('child_process');
 
-const CONFIG_PATH = path.join(__dirname, 'config.json');
+const APP_ROOT = path.basename(__dirname) === "dist" ? path.resolve(__dirname, "..") : __dirname;
+const CONFIG_PATH = path.join(APP_ROOT, 'config.json');
 function readConfig() {
   try { return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); } catch { return {}; }
 }
@@ -51,7 +52,7 @@ function nameFromPath(p) {
 // Dedicated CDP profile - keeps user's main browser profile untouched.
 // Etsy/Pinterest/Alura need a one-time login here, then it persists.
 function getCdpProfileDir() {
-  const dir = path.join(__dirname, 'data', 'cdp-profile');
+  const dir = path.join(APP_ROOT, 'data', 'cdp-profile');
   const isFirstLaunch = !fs.existsSync(dir) || fs.readdirSync(dir).length === 0;
   fs.mkdirSync(dir, { recursive: true });
   return { dir, isFirstLaunch };
@@ -102,13 +103,13 @@ const PORT = process.env.PORT || 3001;
 
 // Ensure directories exist
 ['designs', 'output', 'uploads', 'mockups', 'data', 'data/batches', 'data/jobs', 'data/qc-results'].forEach(dir => {
-  fs.mkdirSync(path.join(__dirname, dir), { recursive: true });
+  fs.mkdirSync(path.join(APP_ROOT, dir), { recursive: true });
 });
 
 // ── Presets (file-based) ──
-const PRESETS_FILE = path.join(__dirname, 'data', 'presets.json');
-const STATS_FILE = path.join(__dirname, 'data', 'stats.json');
-const QC_DIR = path.join(__dirname, 'data', 'qc-results');
+const PRESETS_FILE = path.join(APP_ROOT, 'data', 'presets.json');
+const STATS_FILE = path.join(APP_ROOT, 'data', 'stats.json');
+const QC_DIR = path.join(APP_ROOT, 'data', 'qc-results');
 
 function loadPresets() {
   try { return JSON.parse(fs.readFileSync(PRESETS_FILE, 'utf8')); }
@@ -212,7 +213,7 @@ function getWeekStats() {
 async function runQualityCheck(sku, preset) {
   const issues = [];
   const warnings = [];
-  const outputDir = path.join(__dirname, 'output');
+  const outputDir = path.join(APP_ROOT, 'output');
   const metaPath = path.join(outputDir, sku + '.meta.json');
   let meta = {};
   try { meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')); } catch {}
@@ -238,7 +239,7 @@ async function runQualityCheck(sku, preset) {
     try {
       const sharp = require('sharp');
       for (const mp of mockupPaths) {
-        const absPath = path.join(__dirname, mp.replace(/^\//, ''));
+        const absPath = path.join(APP_ROOT, mp.replace(/^\//, ''));
         if (!fs.existsSync(absPath)) continue;
         const metadata = await sharp(absPath).metadata();
         if (preset?.quality?.checkDimensions && (metadata.width < 1500 || metadata.height < 1500)) {
@@ -359,7 +360,7 @@ function collectProtectedFiles() {
     }
   } catch {}
 
-  const batchesDir = path.join(__dirname, 'data', 'batches');
+  const batchesDir = path.join(APP_ROOT, 'data', 'batches');
   try {
     const files = fs.readdirSync(batchesDir).filter(f => f.endsWith('.json'));
     for (const f of files) {
@@ -390,7 +391,7 @@ function getCleanupPreview(maxAgeDays = 30) {
   const { protectedFiles, protectedBatches } = collectProtectedFiles();
 
   // Old output files — skip any referenced by a resumable job or pending batch
-  const outputDir = path.join(__dirname, 'output');
+  const outputDir = path.join(APP_ROOT, 'output');
   try {
     const files = fs.readdirSync(outputDir);
     for (const f of files) {
@@ -418,7 +419,7 @@ function getCleanupPreview(maxAgeDays = 30) {
   } catch {}
 
   // Old batches — skip any with non-completed rows
-  const batchesDir = path.join(__dirname, 'data', 'batches');
+  const batchesDir = path.join(APP_ROOT, 'data', 'batches');
   try {
     const files = fs.readdirSync(batchesDir).filter(f => f.endsWith('.json'));
     for (const f of files) {
@@ -440,20 +441,20 @@ function executeCleanup(maxAgeDays = 30) {
   let deleted = 0;
 
   for (const f of preview.oldOutputs) {
-    try { fs.unlinkSync(path.join(__dirname, 'output', f.name)); deleted++; } catch {}
+    try { fs.unlinkSync(path.join(APP_ROOT, 'output', f.name)); deleted++; } catch {}
   }
   for (const j of preview.failedJobs) {
     try { fs.unlinkSync(path.join(JOBS_DIR, j.sku + '.json')); deleted++; } catch {}
   }
   for (const b of preview.oldBatches) {
-    try { fs.unlinkSync(path.join(__dirname, 'data', 'batches', b.name)); deleted++; } catch {}
+    try { fs.unlinkSync(path.join(APP_ROOT, 'data', 'batches', b.name)); deleted++; } catch {}
   }
 
   return { deleted, totalSize: preview.totalSize };
 }
 
 // ── Job Queue (file-based) ──
-const JOBS_DIR = path.join(__dirname, 'data', 'jobs');
+const JOBS_DIR = path.join(APP_ROOT, 'data', 'jobs');
 
 function createJob(sku, metadata = {}) {
   const job = {
@@ -528,7 +529,7 @@ let pipelineLock = false;
 
 // Multer config
 const upload = multer({
-  dest: path.join(__dirname, 'uploads'),
+  dest: path.join(APP_ROOT, 'uploads'),
   limits: { fileSize: 50 * 1024 * 1024, files: 25 },
 });
 
@@ -548,7 +549,7 @@ app.use((req, res, next) => {
 // Quick CDP check helper
 async function isCdpAvailable() {
   try {
-    const config = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
+    const config = JSON.parse(fs.readFileSync(path.join(APP_ROOT, 'config.json'), 'utf8'));
     const port = config.cdpPort || 9333;
     // Use lightweight HTTP check instead of full Playwright connect (avoids conflicts)
     const resp = await fetch(`http://localhost:${port}/json/version`);
@@ -562,9 +563,9 @@ app.get('/', (req, res) => {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
-  res.sendFile(path.join(__dirname, 'public', 'app.html'));
+  res.sendFile(path.join(APP_ROOT, 'public', 'app.html'));
 });
-app.get('/legacy', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/legacy', (req, res) => res.sendFile(path.join(APP_ROOT, 'public', 'index.html')));
 
 // Static files (no-store on HTML so cache never serves stale wizard)
 app.use((req, res, next) => {
@@ -576,13 +577,13 @@ app.use((req, res, next) => {
   }
   next();
 });
-app.use(express.static(path.join(__dirname, 'public'), { etag: false, maxAge: 0, index: false }));
-app.use('/designs', express.static(path.join(__dirname, 'designs')));
-app.use('/output', express.static(path.join(__dirname, 'output')));
-app.use('/mockups', express.static(path.join(__dirname, 'mockups')));
+app.use(express.static(path.join(APP_ROOT, 'public'), { etag: false, maxAge: 0, index: false }));
+app.use('/designs', express.static(path.join(APP_ROOT, 'designs')));
+app.use('/output', express.static(path.join(APP_ROOT, 'output')));
+app.use('/mockups', express.static(path.join(APP_ROOT, 'mockups')));
 
 // Cookie storage (file-based, no auth needed)
-const COOKIES_FILE = path.join(__dirname, 'data', 'cookies.json');
+const COOKIES_FILE = path.join(APP_ROOT, 'data', 'cookies.json');
 function loadCookies() {
   try { return JSON.parse(fs.readFileSync(COOKIES_FILE, 'utf8')); } catch { return {}; }
 }
@@ -615,7 +616,7 @@ app.get('/api/cookie-status', (req, res) => {
 
 // List designs
 app.get('/api/designs', (req, res) => {
-  const dir = path.join(__dirname, 'designs');
+  const dir = path.join(APP_ROOT, 'designs');
   const files = fs.readdirSync(dir)
     .filter(f => /\.(png|jpg|jpeg|webp|avif)$/i.test(f))
     .map(f => ({ name: f, path: '/designs/' + f }));
@@ -624,7 +625,7 @@ app.get('/api/designs', (req, res) => {
 
 // List output mockups
 app.get('/api/output', (req, res) => {
-  const dir = path.join(__dirname, 'output');
+  const dir = path.join(APP_ROOT, 'output');
   const files = fs.readdirSync(dir)
     .filter(f => /\.(png|jpg|jpeg|webp|avif)$/i.test(f))
     .map(f => ({ name: f, path: '/output/' + f }));
@@ -635,7 +636,7 @@ app.get('/api/output', (req, res) => {
 let cdpChildPid = null;
 
 app.get('/api/cdp-status', async (req, res) => {
-  const config = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
+  const config = JSON.parse(fs.readFileSync(path.join(APP_ROOT, 'config.json'), 'utf8'));
   const port = config.cdpPort || 9333;
   try {
     const resp = await fetch(`http://localhost:${port}/json/version`);
@@ -671,7 +672,7 @@ app.post('/api/cdp-launch', (req, res) => {
 });
 
 app.post('/api/cdp-close', async (req, res) => {
-  const config = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
+  const config = JSON.parse(fs.readFileSync(path.join(APP_ROOT, 'config.json'), 'utf8'));
   const port = config.cdpPort || 9333;
   try {
     const { chromium } = require('playwright');
@@ -786,7 +787,7 @@ app.post('/api/settings', (req, res) => {
 
 // ── Mockup Library ──
 app.get('/api/mockups', (req, res) => {
-  const dir = path.join(__dirname, 'mockups');
+  const dir = path.join(APP_ROOT, 'mockups');
   const files = fs.readdirSync(dir)
     .filter(f => /\.(png|jpg|jpeg|webp|avif)$/i.test(f))
     .map(f => ({ name: f, path: '/mockups/' + f, thumb: '/api/mockups/thumb/' + encodeURIComponent(f) }));
@@ -795,9 +796,9 @@ app.get('/api/mockups', (req, res) => {
 
 app.get('/api/mockups/thumb/:name', async (req, res) => {
   const safeName = path.basename(req.params.name);
-  const srcPath = path.join(__dirname, 'mockups', safeName);
+  const srcPath = path.join(APP_ROOT, 'mockups', safeName);
   if (!fs.existsSync(srcPath)) return res.status(404).end();
-  const thumbDir = path.join(__dirname, 'mockups', '.thumbs');
+  const thumbDir = path.join(APP_ROOT, 'mockups', '.thumbs');
   fs.mkdirSync(thumbDir, { recursive: true });
   const thumbPath = path.join(thumbDir, safeName + '.webp');
   try {
@@ -820,7 +821,7 @@ app.get('/api/mockups/thumb/:name', async (req, res) => {
 });
 
 app.post('/api/mockups/upload', upload.array('mockups', 20), (req, res) => {
-  const dir = path.join(__dirname, 'mockups');
+  const dir = path.join(APP_ROOT, 'mockups');
   const saved = [];
   for (const file of req.files) {
     const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -833,7 +834,7 @@ app.post('/api/mockups/upload', upload.array('mockups', 20), (req, res) => {
 
 app.delete('/api/mockups/:name', (req, res) => {
   const safeName = path.basename(req.params.name);
-  const filePath = path.join(__dirname, 'mockups', safeName);
+  const filePath = path.join(APP_ROOT, 'mockups', safeName);
   if (fs.existsSync(filePath)) {
     fs.unlinkSync(filePath);
     res.json({ ok: true });
@@ -854,13 +855,13 @@ function renameWithExt(file) {
 app.get('/api/meta/:sku', (req, res) => {
   const sku = req.params.sku;
   let meta = {};
-  const metaPath = path.join(__dirname, 'output', sku + '.meta.json');
+  const metaPath = path.join(APP_ROOT, 'output', sku + '.meta.json');
   try { meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8')); } catch {}
 
   // Fill in designPath if missing - scan designs/ dir
   if (!meta.designPath) {
     try {
-      const designsDir = path.join(__dirname, 'designs');
+      const designsDir = path.join(APP_ROOT, 'designs');
       const designFile = fs.readdirSync(designsDir).find(f => f.startsWith(sku + '_design'));
       if (designFile) meta.designPath = '/designs/' + designFile;
     } catch {}
@@ -869,7 +870,7 @@ app.get('/api/meta/:sku', (req, res) => {
   // Fallback: if mockupTemplatePaths missing, scan mockups/ dir for available templates
   if (!meta.mockupTemplatePaths || meta.mockupTemplatePaths.length === 0) {
     try {
-      const mockupsDir = path.join(__dirname, 'mockups');
+      const mockupsDir = path.join(APP_ROOT, 'mockups');
       const files = fs.readdirSync(mockupsDir).filter(f => /\.(png|jpg|jpeg|webp|avif)$/i.test(f));
       meta.mockupTemplatePaths = files.map(f => '/mockups/' + f);
     } catch {
@@ -912,7 +913,7 @@ app.post('/api/mockup-positions', (req, res) => {
 });
 
 // ── Calibration endpoints ──
-const MOCKUPS_DIR = path.join(__dirname, 'mockups');
+const MOCKUPS_DIR = path.join(APP_ROOT, 'mockups');
 
 app.get('/api/calibrate/status', (req, res) => {
   try {
@@ -1133,7 +1134,7 @@ app.post('/api/regenerate-mockup',
         return res.status(400).json({ error: 'designPath and mockupTemplatePath required' });
       }
 
-      const toAbs = (p) => p.match(/^[a-zA-Z]:/) ? p : path.join(__dirname, p.replace(/^\//, ''));
+      const toAbs = (p) => p.match(/^[a-zA-Z]:/) ? p : path.join(APP_ROOT, p.replace(/^\//, ''));
       const absDesign = toAbs(designPath);
       const absBack = backDesignPath ? toAbs(backDesignPath) : null;
       const absMockup = toAbs(mockupTemplatePath);
@@ -1161,7 +1162,7 @@ app.post('/api/regenerate-mockup',
         fs.renameSync(rawOutput, correctPath);
       }
       // Update meta file so upload uses the regenerated mockup
-      const metaPath = path.join(__dirname, 'output', `${sku}.meta.json`);
+      const metaPath = path.join(APP_ROOT, 'output', `${sku}.meta.json`);
       try {
         const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
         if (meta.mockupPaths && meta.mockupPaths[index] !== undefined) {
@@ -1254,10 +1255,10 @@ app.post('/api/mockup-to-video', express.json(), async (req, res) => {
     if (!src || typeof src !== 'string') return res.status(400).json({ error: 'src required' });
     // src expected to be /output/filename.ext — resolve safely
     const filename = path.basename(src);
-    const inputPath = path.join(__dirname, 'output', filename);
+    const inputPath = path.join(APP_ROOT, 'output', filename);
     if (!fs.existsSync(inputPath)) return res.status(404).json({ error: 'mockup not found: ' + filename });
 
-    const videosDir = path.join(__dirname, 'output', 'videos');
+    const videosDir = path.join(APP_ROOT, 'output', 'videos');
     if (!fs.existsSync(videosDir)) fs.mkdirSync(videosDir, { recursive: true });
     const outName = filename.replace(/\.[^.]+$/, '') + '.mp4';
     const outPath = path.join(videosDir, outName);
@@ -1383,7 +1384,7 @@ app.post('/api/create',
       .split(',')
       .map(p => p.trim())
       .filter(Boolean)
-      .map(p => path.join(__dirname, 'mockups', path.basename(p)));
+      .map(p => path.join(APP_ROOT, 'mockups', path.basename(p)));
 
     // Resume support: skip already-completed steps
     const resumeFrom = req.body.resumeFrom || null; // 'mockup' | 'tags' | 'upload' | 'pinterest'
@@ -1410,7 +1411,7 @@ app.post('/api/create',
     const refPath = refFile ? renameWithExt(refFile) : null;
     const backDesignPath = backDesignFile ? renameWithExt(backDesignFile) : null;
     // Save uploaded mockup templates to mockups/ so they persist for regeneration
-    const mockupsDir = path.join(__dirname, 'mockups');
+    const mockupsDir = path.join(APP_ROOT, 'mockups');
     const uploadedMockupPaths = mockupFiles.map(f => {
       const tmp = renameWithExt(f);
       const safeName = f.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -1445,7 +1446,7 @@ app.post('/api/create',
     if (backDesignPath) allTempFiles.push(backDesignPath);
 
     // Save metadata for resume — preserve existing meta when resuming
-    const metaPath = path.join(__dirname, 'output', sku + '.meta.json');
+    const metaPath = path.join(APP_ROOT, 'output', sku + '.meta.json');
     let meta;
     if (isResume && fs.existsSync(metaPath)) {
       try { meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8')); } catch { meta = {}; }
@@ -1477,19 +1478,19 @@ app.post('/api/create',
 
       if (!shouldRun('generate') && existingDesign) {
         // Resume: use existing design
-        designPath = path.join(__dirname, existingDesign.replace(/^\//, ''));
+        designPath = path.join(APP_ROOT, existingDesign.replace(/^\//, ''));
         send({ type: 'step-done', step: 'generate', message: 'Tasarım (önceden hazır)' });
         send({ type: 'design', path: existingDesign, name: path.basename(existingDesign) });
         send({ type: 'log', message: 'Tasarım adımı atlandı (devam)' });
         // Restore back design from meta for front-back mode
         if (mode === 'front-back' && meta.backDesignPath) {
-          backDesignFinalPath = path.join(__dirname, meta.backDesignPath.replace(/^\//, ''));
+          backDesignFinalPath = path.join(APP_ROOT, meta.backDesignPath.replace(/^\//, ''));
         }
       } else if (!shouldRun('generate')) {
         // Resume without design - try to find design by SKU
         send({ type: 'step-done', step: 'generate', message: 'Tasarım adımı atlandı' });
         try {
-          const designsDir = path.join(__dirname, 'designs');
+          const designsDir = path.join(APP_ROOT, 'designs');
           const found = fs.readdirSync(designsDir).find(f => f.startsWith(sku + '_design'));
           if (found) {
             designPath = path.join(designsDir, found);
@@ -1499,7 +1500,7 @@ app.post('/api/create',
       } else {
         const designExt = path.extname(refFile.originalname) || '.png';
         const designName = `${sku}_design${designExt}`;
-        designPath = path.join(__dirname, 'designs', designName);
+        designPath = path.join(APP_ROOT, 'designs', designName);
         fs.copyFileSync(refPath, designPath);
         send({ type: 'step-done', step: 'generate', message: 'Design ready' });
         send({ type: 'design', path: '/designs/' + designName, name: designName });
@@ -1507,7 +1508,7 @@ app.post('/api/create',
         if (mode === 'front-back' && backDesignPath) {
           const backExt = path.extname(backDesignFile.originalname) || '.png';
           const backName = `${sku}_back${backExt}`;
-          backDesignFinalPath = path.join(__dirname, 'designs', backName);
+          backDesignFinalPath = path.join(APP_ROOT, 'designs', backName);
           fs.copyFileSync(backDesignPath, backDesignFinalPath);
           send({ type: 'design', path: '/designs/' + backName, name: backName });
         }
@@ -1517,12 +1518,12 @@ app.post('/api/create',
       // Recover backDesignFinalPath from meta or disk if not set (e.g. continueFrom placement-approve)
       if (!backDesignFinalPath && mode === 'front-back') {
         if (meta.backDesignPath) {
-          const recovered = path.join(__dirname, meta.backDesignPath.replace(/^\//, ''));
+          const recovered = path.join(APP_ROOT, meta.backDesignPath.replace(/^\//, ''));
           if (fs.existsSync(recovered)) backDesignFinalPath = recovered;
         }
         if (!backDesignFinalPath) {
           try {
-            const designsDir = path.join(__dirname, 'designs');
+            const designsDir = path.join(APP_ROOT, 'designs');
             const found = fs.readdirSync(designsDir).find(f => f.startsWith(sku + '_back'));
             if (found) backDesignFinalPath = path.join(designsDir, found);
           } catch {}
@@ -1641,14 +1642,14 @@ app.post('/api/create',
       }
 
       const _dbg = {continueFrom, resumeFrom, effectiveResumeFrom, mockupPathsLen: mockupPaths.length, existingMockups: !!existingMockups, shouldRunMockup: shouldRun('mockup'), mockupNames: mockupPaths.map(p=>path.basename(p)), fullAuto};
-      fs.writeFileSync(path.join(__dirname, 'mockup-debug.log'), JSON.stringify(_dbg, null, 2));
+      fs.writeFileSync(path.join(APP_ROOT, 'mockup-debug.log'), JSON.stringify(_dbg, null, 2));
       send({ type: 'log', message: '[DEBUG] ' + JSON.stringify(_dbg) });
 
       if (imageToMockupHandled) {
         // Already handled above
       } else if ((!shouldRun('mockup') || (continueFrom && continueFrom !== 'placement-approve')) && existingMockups) {
         // Resume or continueFrom: use existing mockups
-        mockupOutputs = existingMockups.split(',').map(p => path.join(__dirname, p.trim().replace(/^\//, '')));
+        mockupOutputs = existingMockups.split(',').map(p => path.join(APP_ROOT, p.trim().replace(/^\//, '')));
         send({ type: 'step-done', step: 'mockup', message: `Mockup (${mockupOutputs.length} adet hazır)` });
         // Use saved template paths from meta if no new uploads
         const resumeTemplatePaths = mockupTemplatePaths.length > 0 ? mockupTemplatePaths : (meta.mockupTemplatePaths || []);
@@ -1812,9 +1813,9 @@ app.post('/api/create',
         try {
           // pipeline tetigi: ilk mockup hazir olunca onu analiz et
           const sourceImagePath = (mockupOutputs && mockupOutputs[0])
-            || (meta.mockupPaths && meta.mockupPaths[0] ? path.join(__dirname, meta.mockupPaths[0].replace(/^\//, '')) : null)
+            || (meta.mockupPaths && meta.mockupPaths[0] ? path.join(APP_ROOT, meta.mockupPaths[0].replace(/^\//, '')) : null)
             || designPath
-            || (meta.designPath ? path.join(__dirname, meta.designPath.replace(/^\//, '')) : null);
+            || (meta.designPath ? path.join(APP_ROOT, meta.designPath.replace(/^\//, '')) : null);
           if (!sourceImagePath || !fs.existsSync(sourceImagePath)) {
             throw new Error('Mockup veya design image bulunamadi (Tag Lab pipeline icin gerekli)');
           }
@@ -1861,9 +1862,9 @@ app.post('/api/create',
         send({ type: 'step-start', step: 'tags', message: 'AI tag/title/description (composed mockup uzerinden)...' });
         try {
           const sourceImagePath = (mockupOutputs && mockupOutputs[0])
-            || (meta.mockupPaths && meta.mockupPaths[0] ? path.join(__dirname, meta.mockupPaths[0].replace(/^\//, '')) : null)
+            || (meta.mockupPaths && meta.mockupPaths[0] ? path.join(APP_ROOT, meta.mockupPaths[0].replace(/^\//, '')) : null)
             || designPath
-            || (meta.designPath ? path.join(__dirname, meta.designPath.replace(/^\//, '')) : null);
+            || (meta.designPath ? path.join(APP_ROOT, meta.designPath.replace(/^\//, '')) : null);
           if (!sourceImagePath || !fs.existsSync(sourceImagePath)) {
             throw new Error('Mockup veya design image bulunamadi');
           }
@@ -2180,7 +2181,7 @@ app.post('/api/create',
       if (isValidListingUrl(listingUrl)) {
         // Update meta with listingUrl
         try {
-          const mp = path.join(__dirname, 'output', sku + '.meta.json');
+          const mp = path.join(APP_ROOT, 'output', sku + '.meta.json');
           const existing = fs.existsSync(mp) ? JSON.parse(fs.readFileSync(mp, 'utf-8')) : {};
           existing.listingUrl = listingUrl;
           if (pinterestDone) existing.pinterestDone = true;
@@ -2189,7 +2190,7 @@ app.post('/api/create',
         } catch {}
         // Only write .done marker when pinterest is also completed
         if (pinterestDone) {
-          const donePath = path.join(__dirname, 'output', sku + '.done');
+          const donePath = path.join(APP_ROOT, 'output', sku + '.done');
           try { fs.writeFileSync(donePath, listingUrl); } catch {}
         }
       }
@@ -2234,7 +2235,7 @@ async function composeFrontBackMockup(frontDesignPath, backDesignPath, mockupPat
   const apiKey = overrideApiKey || process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error('API key not set. Ayarlar sayfasindan API anahtarinizi girin.');
 
-  const OUTPUT_DIR = path.join(__dirname, 'output');
+  const OUTPUT_DIR = path.join(APP_ROOT, 'output');
 
   function readAsBase64(filePath) {
     const data = fs.readFileSync(filePath);
@@ -2434,7 +2435,7 @@ app.get('/api/jobs/bulk-placement', (req, res) => {
   const jobs = listJobs({ status: 'paused' }).filter(j => j.currentStep === 'placement');
   const positions = (() => { try { return JSON.parse(fs.readFileSync(POSITIONS_FILE, 'utf8')); } catch { return {}; } })();
   const items = jobs.map(job => {
-    const metaPath = path.join(__dirname, 'output', job.sku + '.meta.json');
+    const metaPath = path.join(APP_ROOT, 'output', job.sku + '.meta.json');
     let meta = {};
     try { meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')); } catch {}
     const mockupTemplates = (meta.mockupTemplatePaths || []).map(p => {
@@ -2496,7 +2497,7 @@ app.get('/api/job/:sku/batch', (req, res) => {
 });
 
 // ── Batch CRUD ──
-const BATCHES_DIR = path.join(__dirname, 'data', 'batches');
+const BATCHES_DIR = path.join(APP_ROOT, 'data', 'batches');
 
 app.post('/api/batch', (req, res) => {
   const batchId = 'batch-' + Date.now();
@@ -2568,7 +2569,7 @@ app.delete('/api/batch/:batchId', (req, res) => {
 app.get('/api/bulk-history', (req, res) => {
   try {
     const includeAll = req.query.all === '1' || req.query.all === 'true';
-    const outputDir = path.join(__dirname, 'output');
+    const outputDir = path.join(APP_ROOT, 'output');
     const metaFiles = fs.readdirSync(outputDir).filter(f => f.endsWith('.meta.json'));
     const items = [];
     for (const f of metaFiles) {
@@ -2602,7 +2603,7 @@ app.get('/api/bulk-history', (req, res) => {
 
 app.delete('/api/bulk-history/:sku', (req, res) => {
   const sku = req.params.sku;
-  const outputDir = path.join(__dirname, 'output');
+  const outputDir = path.join(APP_ROOT, 'output');
   // Delete meta, done, and job files
   [sku + '.meta.json', sku + '.done'].forEach(f => {
     const p = path.join(outputDir, f);
@@ -2623,7 +2624,7 @@ app.delete('/api/bulk-history/:sku', (req, res) => {
 app.delete('/api/bulk-history', (req, res) => {
   // Delete ALL incomplete items
   try {
-    const outputDir = path.join(__dirname, 'output');
+    const outputDir = path.join(APP_ROOT, 'output');
     const metaFiles = fs.readdirSync(outputDir).filter(f => f.endsWith('.meta.json'));
     for (const f of metaFiles) {
       const sku = f.replace('.meta.json', '');
@@ -2764,7 +2765,7 @@ app.get('/api/health-check', async (req, res) => {
   checks.todayStats = getTodayStats();
   // Disk usage
   try {
-    const outputDir = path.join(__dirname, 'output');
+    const outputDir = path.join(APP_ROOT, 'output');
     const files = fs.readdirSync(outputDir);
     let totalSize = 0;
     files.forEach(f => { try { totalSize += fs.statSync(path.join(outputDir, f)).size; } catch {} });
@@ -2850,7 +2851,7 @@ app.get('/api/ops/run', (req, res) => {
   let cmd, args;
   if (script.file) {
     cmd = process.execPath;
-    args = [path.join(__dirname, script.file)];
+    args = [path.join(APP_ROOT, script.file)];
   } else if (pkgScripts[script.id]) {
     cmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
     args = ['run', script.id];
@@ -2860,7 +2861,7 @@ app.get('/api/ops/run', (req, res) => {
   }
 
   send('start', { id: script.id, label: script.label, cmd: `${cmd} ${args.join(' ')}` });
-  const child = spawn(cmd, args, { cwd: __dirname, shell: false });
+  const child = spawn(cmd, args, { cwd: APP_ROOT, shell: false });
 
   child.stdout.on('data', d => send('stdout', { line: d.toString() }));
   child.stderr.on('data', d => send('stderr', { line: d.toString() }));
@@ -2871,7 +2872,7 @@ app.get('/api/ops/run', (req, res) => {
 });
 
 app.get('/api/ops/rules', (req, res) => {
-  const rulesDir = path.join(__dirname, 'etsy-rules');
+  const rulesDir = path.join(APP_ROOT, 'etsy-rules');
   if (!fs.existsSync(rulesDir)) return res.json({ topics: [] });
   const topics = fs.readdirSync(rulesDir, { withFileTypes: true })
     .filter(d => d.isDirectory() && /^\d{2}-/.test(d.name))
@@ -2895,7 +2896,7 @@ app.get('/api/ops/rule/:slug', (req, res) => {
   const slug = req.params.slug;
   if (!/^\d{2}-[a-z0-9-]+$/i.test(slug)) return res.status(400).json({ error: 'bad slug' });
   const which = req.query.which === 'sources' ? 'sources.md' : 'rules.md';
-  const filePath = path.join(__dirname, 'etsy-rules', slug, which);
+  const filePath = path.join(APP_ROOT, 'etsy-rules', slug, which);
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'not found' });
   res.json({ slug, which, content: fs.readFileSync(filePath, 'utf8') });
 });
@@ -2909,7 +2910,7 @@ app.get('/api/ops/reports', (req, res) => {
   ];
   const items = [];
   for (const root of roots) {
-    const abs = path.join(__dirname, root.dir);
+    const abs = path.join(APP_ROOT, root.dir);
     if (!fs.existsSync(abs)) continue;
     const walk = (dir, depth = 0) => {
       if (depth > 4) return;
@@ -2923,7 +2924,7 @@ app.get('/api/ops/reports', (req, res) => {
           const stat = fs.statSync(full);
           items.push({
             root: root.label,
-            relPath: path.relative(__dirname, full).replace(/\\/g, '/'),
+            relPath: path.relative(APP_ROOT, full).replace(/\\/g, '/'),
             name: e.name,
             size: stat.size,
             mtime: stat.mtimeMs,
@@ -2942,7 +2943,7 @@ app.get('/api/ops/report', (req, res) => {
   if (!rel || rel.includes('..') || path.isAbsolute(rel)) return res.status(400).json({ error: 'bad path' });
   const allowedRoots = ['reports/', 'etsy-projects/', 'output/'];
   if (!allowedRoots.some(r => rel.startsWith(r))) return res.status(403).json({ error: 'outside allowed roots' });
-  const abs = path.join(__dirname, rel);
+  const abs = path.join(APP_ROOT, rel);
   if (!fs.existsSync(abs)) return res.status(404).json({ error: 'not found' });
   if (/\.(xlsx|csv|html)$/i.test(rel)) {
     return res.sendFile(abs);
