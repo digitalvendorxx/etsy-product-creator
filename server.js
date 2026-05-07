@@ -13,7 +13,7 @@ const { extractKeywords } = require('./tag-lab/extract-keywords');
 const { analyzeMockup } = require('./lib/analyze-mockup');
 const { generateMockupFromImage } = require('./lib/generate-mockup-from-image');
 const { generateLifestyleMockups } = require('./lib/lifestyle-mockup');
-const { generateDescription, optimizeTags, generateAltTexts } = require('./lib/optimize');
+const { generateDescription, wrapWithTemplate, optimizeTags, generateAltTexts } = require('./lib/optimize');
 const { uploadToEtsy } = require('./lib/upload-etsy');
 const { pinToPinterest } = require('./lib/pin-to-pinterest');
 const { uploadToEtsyWithCookies } = require('./lib/upload-etsy-cookies');
@@ -49,13 +49,40 @@ function nameFromPath(p) {
   if (s.includes('brave')) return 'Brave';
   return 'Tarayici';
 }
-// Dedicated CDP profile - keeps user's main browser profile untouched.
+// Dedicated CDP profile - keeps user's main browser running side-by-side.
 // Etsy/Pinterest/Alura need a one-time login here, then it persists.
+// Always use a separate profile so launching CDP doesn't force-close the main browser.
 function getCdpProfileDir() {
   const dir = path.join(APP_ROOT, 'data', 'cdp-profile');
   const isFirstLaunch = !fs.existsSync(dir) || fs.readdirSync(dir).length === 0;
   fs.mkdirSync(dir, { recursive: true });
   return { dir, isFirstLaunch };
+}
+
+async function killBrowserProcessesIfNeeded(browserPath) {
+  if (process.platform !== 'win32') return;
+  const exeName = path.basename(browserPath);
+  // Kill main browser exe + Opera's auto-restart watchdog. Use cmd /c so PATH
+  // resolves taskkill reliably and stderr is suppressed.
+  const targets = [exeName, 'opera_crashreporter.exe', 'opera_autoupdate.exe'];
+  async function killOnce() {
+    for (const t of targets) {
+      await new Promise(r => execFile('cmd', ['/c', 'taskkill', '/F', '/IM', t, '/T'], () => r()));
+    }
+  }
+  async function isAlive() {
+    return new Promise(r => {
+      execFile('cmd', ['/c', 'tasklist', '/FI', `IMAGENAME eq ${exeName}`, '/NH'], (err, stdout) => {
+        r(!!stdout && stdout.toLowerCase().includes(exeName.toLowerCase()));
+      });
+    });
+  }
+  // Up to 3 kill attempts in case Opera respawns from a watchdog
+  for (let i = 0; i < 3; i++) {
+    await killOnce();
+    await new Promise(r => setTimeout(r, 800));
+    if (!(await isAlive())) return;
+  }
 }
 
 // Helper: load mockup position data for a template
@@ -533,6 +560,41 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024, files: 25 },
 });
 
+const createUpload = upload.fields([
+  { name: 'ref', maxCount: 1 },
+  { name: 'backDesign', maxCount: 1 },
+  { name: 'mockups', maxCount: 20 },
+  { name: 'productPhotos', maxCount: 5 },
+]);
+
+// SSE response opener — must run BEFORE multer so the browser receives response
+// headers + initial padding immediately, instead of waiting for multipart parsing.
+// Connection: close forces a fresh TCP socket per request, working around Chromium
+// keep-alive sockets that get stuck after a previous broken response.
+function openCreateSse(req, res, next) {
+  req.setTimeout(0);
+  res.setTimeout(0);
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'close',
+    'X-Accel-Buffering': 'no',
+  });
+  if (res.socket && typeof res.socket.setNoDelay === 'function') res.socket.setNoDelay(true);
+  if (typeof res.flushHeaders === 'function') res.flushHeaders();
+  res.write(':' + ' '.repeat(2049) + '\n\n');
+  next();
+}
+
+function parseCreateUpload(req, res, next) {
+  createUpload(req, res, (err) => {
+    if (!err) return next();
+    res.write(`data: ${JSON.stringify({ type: 'error', message: err.message || 'Yukleme basarisiz' })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
+    res.end();
+  });
+}
+
 // Parse JSON body
 app.use(express.json());
 
@@ -559,13 +621,35 @@ async function isCdpAvailable() {
 }
 
 // Default page: new minimal UI. Legacy at /legacy.
-app.get('/', (req, res) => {
+// Read + send manually so no ETag / Last-Modified is attached — those let the
+// browser send a conditional request and receive a 304, serving stale HTML
+// even with `Cache-Control: no-cache`.
+// Build identifier: changes whenever the server restarts. Page contains a
+// script that compares this to a stored value and force-reloads the page on
+// mismatch — guarantees the user is never stuck on a cached old build.
+const BUILD_ID = String(Date.now());
+
+function sendHtmlNoCache(res, filePath) {
+  let html = fs.readFileSync(filePath, 'utf8');
+  // Inject the build id + a self-healing reload script just after <head>.
+  const reloadScript = `<meta name="build-id" content="${BUILD_ID}"><script>(function(){var b='${BUILD_ID}';try{var k='etsy_build_id';var prev=sessionStorage.getItem(k);if(prev&&prev!==b){sessionStorage.setItem(k,b);location.reload();return;}sessionStorage.setItem(k,b);}catch(e){}})();</script>`;
+  if (/<head[^>]*>/i.test(html)) {
+    html = html.replace(/<head[^>]*>/i, m => m + reloadScript);
+  } else {
+    html = reloadScript + html;
+  }
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
-  res.sendFile(path.join(APP_ROOT, 'public', 'app.html'));
-});
-app.get('/legacy', (req, res) => res.sendFile(path.join(APP_ROOT, 'public', 'index.html')));
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.setHeader('X-Build-Id', BUILD_ID);
+  res.removeHeader('ETag');
+  res.removeHeader('Last-Modified');
+  res.status(200).end(html);
+}
+app.get('/', (req, res) => sendHtmlNoCache(res, path.join(APP_ROOT, 'public', 'app.html')));
+app.get('/legacy', (req, res) => sendHtmlNoCache(res, path.join(APP_ROOT, 'public', 'index.html')));
+app.get('/api/build', (req, res) => res.json({ buildId: BUILD_ID }));
 
 // Static files (no-store on HTML so cache never serves stale wizard)
 app.use((req, res, next) => {
@@ -647,7 +731,7 @@ app.get('/api/cdp-status', async (req, res) => {
   }
 });
 
-app.post('/api/cdp-launch', (req, res) => {
+app.post('/api/cdp-launch', async (req, res) => {
   const config = readConfig();
   const port = config.cdpPort || 9333;
   const resolved = resolveBrowserPath();
@@ -656,7 +740,8 @@ app.post('/api/cdp-launch', (req, res) => {
   }
   const browserPath = resolved.path;
   const { dir: cdpProfile, isFirstLaunch } = getCdpProfileDir();
-  const args = [`--remote-debugging-port=${port}`, `--user-data-dir=${cdpProfile}`, '--no-first-run', '--no-default-browser-check'];
+  // Don't kill existing browser — separate --user-data-dir spawns a side-by-side instance.
+  const args = [`--remote-debugging-port=${port}`, `--user-data-dir=${cdpProfile}`, '--remote-allow-origins=*', '--no-first-run', '--no-default-browser-check'];
   const child = execFile(browserPath, args, { detached: true, stdio: 'ignore' });
   cdpChildPid = child.pid;
   child.unref();
@@ -730,9 +815,10 @@ app.post('/api/browser/start', (req, res) => {
     spawnAndWait();
   }).catch(() => spawnAndWait());
 
-  function spawnAndWait() {
+  async function spawnAndWait() {
     const { dir: cdpProfile, isFirstLaunch } = getCdpProfileDir();
-    const args = [`--remote-debugging-port=${port}`, `--user-data-dir=${cdpProfile}`, '--no-first-run', '--no-default-browser-check'];
+    // Don't kill existing browser — separate --user-data-dir spawns a side-by-side instance.
+    const args = [`--remote-debugging-port=${port}`, `--user-data-dir=${cdpProfile}`, '--remote-allow-origins=*', '--no-first-run', '--no-default-browser-check'];
     let child;
     try {
       child = execFile(resolved.path, args, { detached: true, stdio: 'ignore' });
@@ -1295,24 +1381,9 @@ app.post('/api/mockup-to-video', express.json(), async (req, res) => {
 
 // Main pipeline endpoint — SSE response
 app.post('/api/create',
-  upload.fields([
-    { name: 'ref', maxCount: 1 },
-    { name: 'backDesign', maxCount: 1 },
-    { name: 'mockups', maxCount: 20 },
-    { name: 'productPhotos', maxCount: 5 },
-  ]),
+  openCreateSse,
+  parseCreateUpload,
   async (req, res) => {
-    // Disable request timeout — pipeline can take several minutes
-    req.setTimeout(0);
-    res.setTimeout(0);
-
-    // SSE headers
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-    });
-
     // Pipeline concurrency lock
     if (pipelineLock) {
       res.write(`data: ${JSON.stringify({ type: 'error', message: 'Baska bir pipeline zaten calisiyor. Lutfen bekleyin.' })}\n\n`);
@@ -1847,7 +1918,7 @@ app.post('/api/create',
               send({ type: 'title', title });
             }
             if (result.description) {
-              description = result.description;
+              description = wrapWithTemplate(result.description, title);
               meta.description = description;
               send({ type: 'description', description });
             }
@@ -1881,7 +1952,7 @@ app.post('/api/create',
             send({ type: 'title', title });
           }
           if (analysis.description) {
-            description = analysis.description;
+            description = wrapWithTemplate(analysis.description, title);
             meta.description = description;
             send({ type: 'description', description });
           }
@@ -1993,7 +2064,7 @@ app.post('/api/create',
             send({ type: 'title', title });
           }
           if (analysis.description) {
-            description = analysis.description;
+            description = wrapWithTemplate(analysis.description, title);
             send({ type: 'description', description });
           }
           if (analysis.tags && analysis.tags.length && (!tags || tags.length === 0)) {

@@ -1386,6 +1386,21 @@ textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent
   padding: 0.75rem;
   margin-bottom: 0.75rem;
   background: var(--bg-input);
+  transition: border-color .15s, background .15s, box-shadow .15s;
+}
+.mockup-library.dragover {
+  border: 1.5px dashed var(--accent);
+  background: var(--accent-dim);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+.mockup-library.dragover::after {
+  content: 'Birak - kutuphaneye yukle';
+  display: block;
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--accent-light);
+  font-weight: 600;
+  margin-top: 0.4rem;
 }
 .mockup-library-header {
   display: flex;
@@ -3896,10 +3911,13 @@ https://www.etsy.com/listing/.../...
       <div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:1rem;display:flex;flex-direction:column;gap:0.75rem">
         <div id="calib-preview-area" style="flex:1;position:relative;overflow:hidden;background:var(--bg-input);border-radius:var(--radius-xs);display:flex;align-items:center;justify-content:center;min-height:400px;cursor:crosshair" onmousedown="calibStartDrag(event)" onmousemove="calibDrag(event)" onmouseup="calibEndDrag(event)">
           <img id="calib-preview-img" style="max-width:100%;max-height:100%;display:none;user-select:none;pointer-events:none" draggable="false">
-          <div id="calib-rect" style="position:absolute;border:2px dashed red;background:rgba(255,0,0,0.1);display:none;pointer-events:none;overflow:hidden">
-            <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(255,0,0,0.4)"></div>
-            <div style="position:absolute;top:50%;left:0;right:0;height:1px;background:rgba(255,0,0,0.4)"></div>
-            <div style="position:absolute;left:0;top:0;width:100%;height:100%;background:linear-gradient(to bottom right,transparent calc(50% - 0.5px),rgba(255,0,0,0.25) calc(50% - 0.5px),rgba(255,0,0,0.25) calc(50% + 0.5px),transparent calc(50% + 0.5px)),linear-gradient(to top right,transparent calc(50% - 0.5px),rgba(255,0,0,0.25) calc(50% - 0.5px),rgba(255,0,0,0.25) calc(50% + 0.5px),transparent calc(50% + 0.5px))"></div>
+          <div id="calib-rect" style="position:absolute;border:2px dashed red;background:rgba(255,0,0,0.06);display:none;pointer-events:none;overflow:hidden">
+            <img id="calib-design-overlay" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:0.85;display:none;pointer-events:none" draggable="false">
+            <div id="calib-rect-guides">
+              <div style="position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(255,0,0,0.4)"></div>
+              <div style="position:absolute;top:50%;left:0;right:0;height:1px;background:rgba(255,0,0,0.4)"></div>
+              <div style="position:absolute;left:0;top:0;width:100%;height:100%;background:linear-gradient(to bottom right,transparent calc(50% - 0.5px),rgba(255,0,0,0.25) calc(50% - 0.5px),rgba(255,0,0,0.25) calc(50% + 0.5px),transparent calc(50% + 0.5px)),linear-gradient(to top right,transparent calc(50% - 0.5px),rgba(255,0,0,0.25) calc(50% - 0.5px),rgba(255,0,0,0.25) calc(50% + 0.5px),transparent calc(50% + 0.5px))"></div>
+            </div>
           </div>
           <div id="calib-empty" style="color:var(--text-dim);font-size:0.85rem">Bir sablon secin</div>
         </div>
@@ -3948,14 +3966,30 @@ https://www.etsy.com/listing/.../...
             </div>
           </div>
           <div style="display:flex;flex-direction:column;gap:2px;align-items:center">
-            <span style="font-size:0.6rem;color:var(--text-dim)">Boyut</span>
+            <span style="font-size:0.6rem;color:var(--text-dim)">Boyut (orantili)</span>
             <div style="display:flex;gap:2px">
               <button class="btn-ghost" style="padding:2px 8px;font-size:0.75rem;border-radius:var(--radius-xs)" onclick="calibScale(-1)" title="Kucult">-</button>
               <button class="btn-ghost" style="padding:2px 8px;font-size:0.75rem;border-radius:var(--radius-xs)" onclick="calibScale(1)" title="Buyut">+</button>
             </div>
           </div>
+          <div style="display:flex;flex-direction:column;gap:2px;align-items:center">
+            <span style="font-size:0.6rem;color:var(--text-dim)">Genislik</span>
+            <div style="display:flex;gap:2px">
+              <button class="btn-ghost" style="padding:2px 8px;font-size:0.75rem;border-radius:var(--radius-xs)" onclick="calibAxis('w',-1)" title="Daralt">W-</button>
+              <button class="btn-ghost" style="padding:2px 8px;font-size:0.75rem;border-radius:var(--radius-xs)" onclick="calibAxis('w',1)" title="Genislet">W+</button>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:2px;align-items:center">
+            <span style="font-size:0.6rem;color:var(--text-dim)">Yukseklik</span>
+            <div style="display:flex;gap:2px">
+              <button class="btn-ghost" style="padding:2px 8px;font-size:0.75rem;border-radius:var(--radius-xs)" onclick="calibAxis('h',-1)" title="Kisalt">H-</button>
+              <button class="btn-ghost" style="padding:2px 8px;font-size:0.75rem;border-radius:var(--radius-xs)" onclick="calibAxis('h',1)" title="Uzat">H+</button>
+            </div>
+          </div>
+          <button class="btn-ghost" style="padding:0.35rem 0.7rem;font-size:0.72rem;border-radius:var(--radius-xs)" onclick="calibSwapWH()" title="Yatay/Dikey degis">W/H</button>
           <div style="border-left:1px solid var(--border);height:32px;margin:0 0.25rem"></div>
           <button class="btn-ghost" style="padding:0.35rem 0.7rem;font-size:0.72rem;border-radius:var(--radius-xs)" onclick="calibAutoSingle()">Otomatik</button>
+          <button class="btn-ghost" style="padding:0.35rem 0.7rem;font-size:0.72rem;border-radius:var(--radius-xs)" onclick="calibLoadDesignOverlay()">Tasarim Yukle</button>
           <button class="btn-ghost" style="padding:0.35rem 0.7rem;font-size:0.72rem;border-radius:var(--radius-xs)" onclick="calibTestPreview()">Onizleme</button>
           <input type="file" id="calib-test-design" accept="image/*" style="display:none">
           <button class="btn-primary" style="width:auto;padding:0.35rem 0.7rem;font-size:0.72rem" onclick="calibSave()">Kaydet</button>
@@ -4916,6 +4950,36 @@ window.toggleTheme = function() {
   }
 
   loadMockupLibrary();
+
+  // Library-level drag-and-drop upload
+  const libRoot = document.querySelector('.mockup-library');
+  if (libRoot) {
+    let dragCounter = 0;
+    libRoot.addEventListener('dragenter', e => {
+      if (!e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes('Files')) return;
+      e.preventDefault();
+      dragCounter++;
+      libRoot.classList.add('dragover');
+    });
+    libRoot.addEventListener('dragover', e => {
+      if (!e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes('Files')) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    });
+    libRoot.addEventListener('dragleave', () => {
+      dragCounter = Math.max(0, dragCounter - 1);
+      if (dragCounter === 0) libRoot.classList.remove('dragover');
+    });
+    libRoot.addEventListener('drop', e => {
+      e.preventDefault();
+      dragCounter = 0;
+      libRoot.classList.remove('dragover');
+      const files = e.dataTransfer && e.dataTransfer.files;
+      if (!files || !files.length) return;
+      const images = Array.from(files).filter(f => f.type.startsWith('image/'));
+      if (images.length) uploadToLibrary(images);
+    });
+  }
 
   // ── Pipeline steps ──
   const STEPS = [
@@ -10760,6 +10824,57 @@ window.toggleTheme = function() {
     calibUpdateRect();
   }
   window.calibScale = calibScale;
+
+  // Resize a single axis (width or height) and re-center on that axis only.
+  function calibAxis(axis, dir) {
+    const step = parseInt(document.getElementById('calib-step').value) || 20;
+    const dimEl = document.getElementById(axis === 'w' ? 'calib-w' : 'calib-h');
+    const posEl = document.getElementById(axis === 'w' ? 'calib-x' : 'calib-y');
+    const cur = parseInt(dimEl.value) || 0;
+    const delta = dir * step * 2;
+    dimEl.value = Math.max(10, cur + delta);
+    posEl.value = Math.max(0, (parseInt(posEl.value) || 0) - Math.round(delta / 2));
+    calibUpdateRect();
+  }
+  window.calibAxis = calibAxis;
+
+  // Swap width and height (rotate aspect 90deg without changing center).
+  function calibSwapWH() {
+    const wEl = document.getElementById('calib-w');
+    const hEl = document.getElementById('calib-h');
+    const xEl = document.getElementById('calib-x');
+    const yEl = document.getElementById('calib-y');
+    const w = parseInt(wEl.value) || 0;
+    const h = parseInt(hEl.value) || 0;
+    if (w <= 0 || h <= 0) return;
+    const cx = (parseInt(xEl.value) || 0) + w / 2;
+    const cy = (parseInt(yEl.value) || 0) + h / 2;
+    wEl.value = h;
+    hEl.value = w;
+    xEl.value = Math.max(0, Math.round(cx - h / 2));
+    yEl.value = Math.max(0, Math.round(cy - w / 2));
+    calibUpdateRect();
+  }
+  window.calibSwapWH = calibSwapWH;
+
+  // Load a design image into the rect as a live preview overlay.
+  function calibLoadDesignOverlay() {
+    const fileInput = document.getElementById('calib-test-design');
+    fileInput.value = '';
+    fileInput.onchange = function() {
+      if (!fileInput.files || !fileInput.files.length) return;
+      const url = URL.createObjectURL(fileInput.files[0]);
+      const overlay = document.getElementById('calib-design-overlay');
+      const guides = document.getElementById('calib-rect-guides');
+      overlay.src = url;
+      overlay.style.display = 'block';
+      if (guides) guides.style.display = 'none';
+      calibState._overlayLoaded = true;
+      calibUpdateRect();
+    };
+    fileInput.click();
+  }
+  window.calibLoadDesignOverlay = calibLoadDesignOverlay;
 
   async function calibTestPreview() {
     if (!calibState.selected) { alert('Once bir sablon secin'); return; }

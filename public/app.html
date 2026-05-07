@@ -465,6 +465,29 @@
   }
   .mockup-tile.selected .check { display: inline-flex; }
   .mockup-empty { grid-column: 1 / -1; padding: 2rem; text-align: center; color: var(--ink-mid); }
+  .step[data-step="3"].mockup-dragover {
+    outline: 3px dashed var(--accent);
+    outline-offset: -8px;
+    background: var(--accent-soft);
+    border-radius: 16px;
+  }
+  .step[data-step="3"].mockup-dragover::after {
+    content: 'Mockup\'lari birak — kutuphaneye yuklenir';
+    display: block;
+    position: fixed;
+    top: 30%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--accent-deep);
+    color: #fff;
+    padding: 0.8rem 1.5rem;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 1rem;
+    box-shadow: var(--shadow-md);
+    pointer-events: none;
+    z-index: 9999;
+  }
 
   /* ── Choice cards (step 3) ── */
   .choices { display: flex; flex-direction: column; gap: 0.75rem; }
@@ -937,6 +960,7 @@
           <div class="calib-canvas-wrap" id="calibCanvasWrap">
             <img id="calibImg" src="" alt="">
             <div class="calib-rect" id="calibRect">
+              <img id="calibDesignOverlay" style="position:absolute;inset:0;width:100%;height:100%;object-fit:fill;opacity:0.85;pointer-events:none;display:none" draggable="false">
               <span class="handle tl"></span><span class="handle tr"></span>
               <span class="handle bl"></span><span class="handle br"></span>
             </div>
@@ -946,10 +970,19 @@
             <label>Y<input type="number" id="cY" oninput="calibFieldsToRect()"></label>
             <label>W<input type="number" id="cW" oninput="calibFieldsToRect()"></label>
             <label>H<input type="number" id="cH" oninput="calibFieldsToRect()"></label>
+            <label style="flex-direction:row;align-items:center;gap:0.4rem;font-size:0.72rem;cursor:pointer">
+              <input type="checkbox" id="cAspectLock" checked onchange="calibAspectLockChanged()">
+              Oran kilitli
+            </label>
           </div>
           <div class="calib-actions">
             <button class="btn btn-primary" onclick="calibSave()" style="min-height:42px; padding:0 1.2rem; font-size:0.9rem;">Kaydet</button>
             <button class="pill-btn" onclick="calibAutoSingle()">Otomatik algila</button>
+            <button class="pill-btn" onclick="calibSwapWH()" title="Yatay/Dikey">W &harr; H</button>
+            <button class="pill-btn" onclick="calibAxis('w', 1)" title="W +">W +</button>
+            <button class="pill-btn" onclick="calibAxis('w', -1)" title="W -">W -</button>
+            <button class="pill-btn" onclick="calibAxis('h', 1)" title="H +">H +</button>
+            <button class="pill-btn" onclick="calibAxis('h', -1)" title="H -">H -</button>
             <span id="calibSaveStatus" style="margin-left:auto; align-self:center; font-size:0.85rem; color:var(--green); opacity:0; transition:opacity 200ms;"></span>
           </div>
         </div>
@@ -1051,7 +1084,19 @@
       <div class="pstep" id="ps-upload"><span class="ic"></span><span>Etsy'ye yukleniyor</span></div>
     </div>
 
-    <div class="done-grid" id="liveGrid" style="margin-top:1.25rem;"></div>
+    <div class="card" id="liveDesignCard" style="margin-top:1.25rem; display:none;">
+      <div class="card-title">TASARIM</div>
+      <div style="margin-top:0.6rem; display:flex; justify-content:center;">
+        <a id="liveDesignLink" href="#" target="_blank" style="display:block; max-width:320px;">
+          <img id="liveDesignImg" src="" alt="" style="width:100%; height:auto; border-radius:12px; border:1px solid var(--line); display:block;">
+        </a>
+      </div>
+    </div>
+
+    <div class="card" id="liveMockupsCard" style="margin-top:1rem; display:none;">
+      <div class="card-title">MOCKUP'LAR (<span id="liveMockupsCount">0</span>)</div>
+      <div class="done-grid" id="liveGrid" style="margin-top:0.6rem;"></div>
+    </div>
 
     <div class="card" id="liveTitleCard" style="margin-top:1rem; display:none;">
       <div class="card-title">Baslik</div>
@@ -1288,6 +1333,7 @@ const state = {
   fullAuto: true,
   removeBg: false,
   producedMockups: [],
+  producedDesign: null,
   producedTitle: '',
   producedDescription: '',
   producedTags: [],
@@ -1745,7 +1791,7 @@ function restart() {
   state.designAR = null; state.designSize = null;
   state.mockupFiles = []; state.selectedLibrary.clear();
   state.source = null;
-  state.producedMockups = []; state.producedTitle = '';
+  state.producedMockups = []; state.producedDesign = null; state.producedTitle = '';
   state.producedDescription = ''; state.producedTags = [];
   state.producedListingUrl = '';
   document.getElementById('refFile').value = '';
@@ -1780,13 +1826,38 @@ async function refreshStatus() {
 async function onStatusClick() {
   if (state.status.cdpRunning) return toast('Tarayici bagli');
   if (!state.status.browserDetected) return openModal('settings');
+
+  const el = document.getElementById('status');
+  const labelEl = document.getElementById('statusLabel');
+  el.classList.remove('ok', 'bad'); el.classList.add('warn');
+  labelEl.textContent = 'Aciliyor...';
   toast('Tarayici aciliyor...');
-  try {
-    const r = await fetch('/api/browser/start', { method: 'POST' });
-    const d = await r.json();
-    toast(d.ok ? 'Bagli' : (d.error || 'Hata'));
-  } catch { toast('Sunucu hatasi'); }
-  setTimeout(refreshStatus, 1500);
+
+  // Fire launch (don't await full 30s — poll concurrently for green light)
+  let launchErr = null;
+  fetch('/api/browser/start', { method: 'POST' })
+    .then(r => r.json())
+    .then(d => { if (!d.ok) launchErr = d.error || 'Hata'; })
+    .catch(() => { launchErr = 'Sunucu hatasi'; });
+
+  // Poll until CDP is up or 40s timeout
+  const start = Date.now();
+  const tick = setInterval(async () => {
+    try {
+      const b = await fetch('/api/browser/status').then(r => r.json());
+      if (b.cdpRunning) {
+        clearInterval(tick);
+        await refreshStatus();
+        toast('Bagli');
+        return;
+      }
+    } catch {}
+    if (Date.now() - start > 40000) {
+      clearInterval(tick);
+      await refreshStatus();
+      toast(launchErr || 'CDP baslatilamadi');
+    }
+  }, 1000);
 }
 
 // ── File upload ──
@@ -2008,6 +2079,11 @@ async function onMockupUpload(e) {
   const files = Array.from(e.target.files);
   if (!files.length) return;
   e.target.value = '';
+  await uploadMockupFiles(files);
+}
+
+async function uploadMockupFiles(files) {
+  if (!files.length) return;
   try {
     toast(files.length + ' mockup hazirlaniyor...');
     const transcoded = await Promise.all(files.map(transcodeAvifToPng));
@@ -2023,6 +2099,51 @@ async function onMockupUpload(e) {
     toast('Yukleme basarisiz: ' + err.message);
   }
 }
+
+// Drag-and-drop on the whole Step 3 container (mockup picker).
+// Listening on the entire step ensures empty-grid dropzones still receive events.
+(function setupMockupGridDrop() {
+  function init() {
+    const step = document.querySelector('.step[data-step="3"]');
+    if (!step) return;
+    let counter = 0;
+    const isFiles = e => e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
+    // Only react when the standard mockup picker is visible (not AI mode)
+    function active() {
+      const picker = document.getElementById('step3TemplatePicker');
+      return picker && getComputedStyle(picker).display !== 'none' && state.step === 3;
+    }
+    step.addEventListener('dragenter', e => {
+      if (!isFiles(e) || !active()) return;
+      e.preventDefault();
+      counter++;
+      step.classList.add('mockup-dragover');
+    });
+    step.addEventListener('dragover', e => {
+      if (!isFiles(e) || !active()) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    });
+    step.addEventListener('dragleave', e => {
+      if (e.relatedTarget && step.contains(e.relatedTarget)) return;
+      counter = Math.max(0, counter - 1);
+      if (counter === 0) step.classList.remove('mockup-dragover');
+    });
+    step.addEventListener('drop', e => {
+      if (!isFiles(e) || !active()) return;
+      e.preventDefault();
+      counter = 0;
+      step.classList.remove('mockup-dragover');
+      const imgs = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+      if (imgs.length) uploadMockupFiles(imgs);
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
 function removeMockupFile(i) {
   state.mockupFiles.splice(i, 1); renderMockups();
 }
@@ -2244,7 +2365,9 @@ async function _runOne(fd) {
     for (const b of blocks) {
       const dline = b.split('\n').find(l => l.startsWith('data: '));
       if (!dline) continue;
-      try { handleEvent(JSON.parse(dline.slice(6))); } catch {}
+      let parsed;
+      try { parsed = JSON.parse(dline.slice(6)); } catch { continue; }
+      try { handleEvent(parsed); } catch {}
     }
   }
 }
@@ -2256,10 +2379,12 @@ async function startCreate() {
   showStep('progress');
   ['generate', 'mockup', 'tags', 'upload'].forEach(s => setProgressStep(s, null));
   document.getElementById('liveLog').textContent = '';
-  state.producedMockups = []; state.producedTitle = '';
+  state.producedMockups = []; state.producedDesign = null; state.producedTitle = '';
   state.producedDescription = ''; state.producedTags = [];
   state.producedListingUrl = '';
   document.getElementById('liveGrid').innerHTML = '';
+  document.getElementById('liveDesignCard').style.display = 'none';
+  document.getElementById('liveMockupsCard').style.display = 'none';
   document.getElementById('liveTitleCard').style.display = 'none';
   document.getElementById('liveTagsCard').style.display = 'none';
   document.getElementById('liveDescCard').style.display = 'none';
@@ -2277,9 +2402,12 @@ async function startCreate() {
         }
         logLine('━━━━━━━ [' + (i + 1) + '/' + list.length + '] ' + (row.ref ? row.ref.name : 'urun #' + (i + 1)) + ' (' + row.mode + ', ' + row.source + ', ' + row.mockupNames.length + ' mockup) ━━━━━━━');
         ['generate', 'mockup', 'tags', 'upload'].forEach(s => setProgressStep(s, null));
-        state.producedMockups = []; state.producedTitle = '';
+        state.producedMockups = []; state.producedDesign = null; state.producedTitle = '';
         state.producedDescription = ''; state.producedTags = [];
         state.producedListingUrl = '';
+        document.getElementById('liveDesignCard').style.display = 'none';
+        document.getElementById('liveMockupsCard').style.display = 'none';
+        document.getElementById('liveGrid').innerHTML = '';
         try {
           await _runOne(_buildBulkRowFd(row));
           ok++;
@@ -2311,6 +2439,11 @@ function handleEvent(ev) {
   else if (ev.type === 'step-error') { setProgressStep(ev.step, 'failed'); logLine('[' + ev.step + '] HATA: ' + ev.message); }
   else if (ev.type === 'log') logLine(ev.message);
   else if (ev.type === 'warning') logLine('UYARI: ' + ev.message);
+  else if (ev.type === 'design' && ev.path) {
+    state.producedDesign = { name: ev.name || '', path: ev.path };
+    logLine('Tasarim: ' + (ev.name || ev.path));
+    renderLivePreview();
+  }
   else if (ev.type === 'mockup' && ev.path) {
     state.producedMockups.push({ name: ev.name, path: ev.path });
     logLine('Mockup: ' + ev.name);
@@ -2335,13 +2468,33 @@ function handleEvent(ev) {
     state.producedListingUrl = ev.url || '';
     logLine('Listing URL: ' + ev.url);
   }
+  else if (ev.type === 'error') {
+    logLine('HATA: ' + (ev.message || 'bilinmeyen'));
+    toast('Hata: ' + (ev.message || ''));
+  }
+  else if (ev.type === 'done') {
+    logLine('--- pipeline tamamlandi ---');
+  }
 }
 function renderLivePreview() {
+  if (state.producedDesign && state.producedDesign.path) {
+    const img = document.getElementById('liveDesignImg');
+    const link = document.getElementById('liveDesignLink');
+    if (img) {
+      img.src = state.producedDesign.path;
+      if (link) link.href = state.producedDesign.path;
+      document.getElementById('liveDesignCard').style.display = '';
+    }
+  }
   const grid = document.getElementById('liveGrid');
   if (grid) {
     grid.innerHTML = state.producedMockups.map(f =>
       `<a class="done-tile" href="${f.path}" target="_blank"><img src="${f.path}" loading="lazy" alt=""></a>`
     ).join('');
+    if (state.producedMockups.length > 0) {
+      document.getElementById('liveMockupsCount').textContent = state.producedMockups.length;
+      document.getElementById('liveMockupsCard').style.display = '';
+    }
   }
   if (state.producedTitle) {
     document.getElementById('liveTitle').textContent = state.producedTitle;
@@ -2692,7 +2845,19 @@ async function calibInit() {
   }
   try {
     const r = await fetch('/api/calibrate/status'); const d = await r.json();
-    calib.templates = d.templates || [];
+    let templates = d.templates || [];
+    // Only show templates the user actually selected for this pipeline.
+    // Bulk mode pulls selection from each product row; single/front-back use state.selectedLibrary.
+    if (state.mode !== 'bulk' && state.selectedLibrary && state.selectedLibrary.size > 0) {
+      templates = templates.filter(t => state.selectedLibrary.has(t.name));
+    } else if (state.mode === 'bulk' && state.bulkRows) {
+      const used = new Set();
+      state.bulkRows.forEach(row => {
+        if (row && row.selectedLibrary) row.selectedLibrary.forEach(n => used.add(n));
+      });
+      if (used.size > 0) templates = templates.filter(t => used.has(t.name));
+    }
+    calib.templates = templates;
     const cal = calib.templates.filter(t => t.calibrated).length;
     document.getElementById('calibProgress').textContent = cal + '/' + calib.templates.length;
     if (calib.templates.length && (!calib.selected || !calib.templates.find(t => t.name === calib.selected))) {
@@ -2727,6 +2892,22 @@ async function calibSelect(name) {
   renderCalibList();
   document.getElementById('calibEmpty').style.display = 'none';
   document.getElementById('calibEditor').style.display = '';
+  // Load the user's design as a live overlay inside the rect
+  try {
+    const overlay = document.getElementById('calibDesignOverlay');
+    if (overlay) {
+      const designFile = (state.mode === 'front-back' && calib.side === 'back' && state.back) ? state.back : state.ref;
+      if (designFile) {
+        if (overlay._url) URL.revokeObjectURL(overlay._url);
+        const url = URL.createObjectURL(designFile);
+        overlay._url = url;
+        overlay.src = url;
+        overlay.style.display = 'block';
+      } else {
+        overlay.style.display = 'none';
+      }
+    }
+  } catch {}
   const img = document.getElementById('calibImg');
   img.onload = () => {
     calib.meta = { width: img.naturalWidth, height: img.naturalHeight };
@@ -2785,9 +2966,70 @@ function calibFieldsToRect() {
   calib.rect.y = parseInt(document.getElementById('cY').value) || 0;
   const w = parseInt(document.getElementById('cW').value) || 0;
   const h = parseInt(document.getElementById('cH').value) || 0;
+  const lockEl = document.getElementById('cAspectLock');
+  const locked = lockEl ? lockEl.checked : true;
   calib.rect.w = w;
-  calib.rect.h = state.designAR ? Math.round(w / state.designAR) : h;
-  if (state.designAR) document.getElementById('cH').value = calib.rect.h;
+  if (locked && state.designAR) {
+    calib.rect.h = Math.round(w / state.designAR);
+    document.getElementById('cH').value = calib.rect.h;
+  } else {
+    calib.rect.h = h;
+  }
+  updateCalibRect();
+}
+
+function calibAspectLockChanged() {
+  // When locking back on, sync H to W via design aspect
+  const lockEl = document.getElementById('cAspectLock');
+  if (lockEl && lockEl.checked && state.designAR) {
+    const w = parseInt(document.getElementById('cW').value) || 0;
+    const h = Math.round(w / state.designAR);
+    calib.rect.h = h;
+    document.getElementById('cH').value = h;
+    updateCalibRect();
+  }
+}
+
+function calibAxis(axis, dir) {
+  const step = 20;
+  if (axis === 'w') {
+    const wEl = document.getElementById('cW');
+    const xEl = document.getElementById('cX');
+    const cur = parseInt(wEl.value) || 0;
+    const delta = dir * step;
+    wEl.value = Math.max(20, cur + delta);
+    xEl.value = Math.max(0, (parseInt(xEl.value) || 0) - Math.round(delta / 2));
+  } else {
+    const hEl = document.getElementById('cH');
+    const yEl = document.getElementById('cY');
+    const cur = parseInt(hEl.value) || 0;
+    const delta = dir * step;
+    hEl.value = Math.max(20, cur + delta);
+    yEl.value = Math.max(0, (parseInt(yEl.value) || 0) - Math.round(delta / 2));
+  }
+  // Auto-disable aspect lock when adjusting one axis
+  const lockEl = document.getElementById('cAspectLock');
+  if (lockEl) lockEl.checked = false;
+  calibFieldsToRect();
+}
+
+function calibSwapWH() {
+  const wEl = document.getElementById('cW');
+  const hEl = document.getElementById('cY');
+  const xEl = document.getElementById('cX');
+  const yEl = document.getElementById('cY');
+  const w = calib.rect.w;
+  const h = calib.rect.h;
+  if (w <= 0 || h <= 0) return;
+  const cx = calib.rect.x + w / 2;
+  const cy = calib.rect.y + h / 2;
+  calib.rect.w = h;
+  calib.rect.h = w;
+  calib.rect.x = Math.max(0, Math.round(cx - h / 2));
+  calib.rect.y = Math.max(0, Math.round(cy - w / 2));
+  const lockEl = document.getElementById('cAspectLock');
+  if (lockEl) lockEl.checked = false;
+  writeCalibFields();
   updateCalibRect();
 }
 function updateCalibRect() {
@@ -2830,7 +3072,8 @@ function updateCalibRect() {
     const dx = (t.clientX - drag.x) / Math.max(0.01, calib.imgScale);
     const dy = (t.clientY - drag.y) / Math.max(0.01, calib.imgScale);
     const i = drag.init;
-    const ar = state.designAR;
+    const lockEl = document.getElementById('cAspectLock');
+    const ar = (lockEl && !lockEl.checked) ? null : state.designAR;
     if (drag.mode === 'move') {
       calib.rect.x = Math.max(0, i.x + dx);
       calib.rect.y = Math.max(0, i.y + dy);
