@@ -811,6 +811,22 @@
         <span class="arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
       </div>
     </div>
+
+    <!-- Yarim kalan isler paneli -->
+    <div id="interruptedPanel" class="card" style="display:none; margin-top:1.5rem; border:1px solid var(--accent); background:var(--accent-soft);">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:0.8rem; flex-wrap:wrap;">
+        <div>
+          <div style="font-size:0.95rem; font-weight:700; color:var(--accent-deep);">Yarim Kalan Isler</div>
+          <div id="interruptedSummary" style="font-size:0.82rem; color:var(--ink-mid); margin-top:0.2rem;">-</div>
+        </div>
+        <div style="display:flex; gap:0.4rem;">
+          <button class="pill-btn" onclick="loadInterruptedJobs()">Yenile</button>
+          <button class="btn btn-primary" id="resumeAllBtn" onclick="resumeAllInterrupted()" style="min-height:38px; padding:0 1rem; font-size:0.85rem;">Hepsini Devam Ettir</button>
+        </div>
+      </div>
+      <div id="interruptedList" style="margin-top:0.8rem; display:flex; flex-direction:column; gap:0.4rem; max-height:280px; overflow-y:auto;"></div>
+      <div id="interruptedProgress" style="display:none; margin-top:0.8rem; padding:0.7rem; background:var(--bg-card); border-radius:10px; font-size:0.85rem; color:var(--ink-mid);"></div>
+    </div>
   </div>
 
   <!-- ─── STEP 2 — design upload ─── -->
@@ -879,6 +895,42 @@
         </label>
       </div>
       <span id="bgStatus" style="font-size:0.82rem; color:var(--ink-mid);"></span>
+    </div>
+
+    <!-- product-mockup mode: product type + detail (drives mockup pool + description) -->
+    <div id="step2ProductTypeBox" style="display:none; margin-top:1rem; background:var(--bg-card); border:1px solid var(--line); border-radius:14px; padding:0.9rem 1rem;">
+      <div style="font-size:0.85rem; color:var(--ink-mid); font-weight:600; margin-bottom:0.5rem;">Bu urun ne? (mockup ve description bunu kullanir)</div>
+      <div style="display:flex; gap:0.6rem; flex-wrap:wrap; align-items:flex-end;">
+        <div style="flex:0 0 220px; display:flex; flex-direction:column; gap:0.25rem;">
+          <label style="font-size:0.72rem; color:var(--ink-mid);">Kategori</label>
+          <select id="productType" style="padding:0.5rem 0.6rem; border:1px solid var(--line); border-radius:10px; background:var(--bg-input,#fff); font-size:0.88rem;">
+            <option value="">Otomatik (gorseldeki tema)</option>
+            <option value="wall_art">Wall Art / Poster / Canvas</option>
+            <option value="mug">Kupa (mug)</option>
+            <option value="tumbler">Tumbler / Termos</option>
+            <option value="sticker">Sticker (vinyl)</option>
+            <option value="candle">Mum (candle)</option>
+            <option value="blanket">Battaniye (throw blanket)</option>
+            <option value="pillow">Yastik / Kirlent</option>
+            <option value="tshirt">T-Shirt</option>
+            <option value="hoodie">Hoodie / Sweatshirt</option>
+            <option value="hat">Sapka (hat / cap)</option>
+            <option value="bag">Canta</option>
+            <option value="tote">Tote (kanvas canta)</option>
+            <option value="jewelry">Taki</option>
+            <option value="keychain">Anahtarlik</option>
+            <option value="ornament">Susleme (ornament)</option>
+            <option value="notebook">Defter / Journal</option>
+            <option value="poster">Poster</option>
+            <option value="other">Diger</option>
+          </select>
+        </div>
+        <div style="flex:1 1 280px; display:flex; flex-direction:column; gap:0.25rem;">
+          <label style="font-size:0.72rem; color:var(--ink-mid);">Ek detay (opsiyonel)</label>
+          <input type="text" id="productDetail" placeholder="orn: 20oz tumbler with handle, 11x14 inch unframed print, lavender scent" style="padding:0.5rem 0.6rem; border:1px solid var(--line); border-radius:10px; font-size:0.88rem;">
+        </div>
+      </div>
+      <div style="font-size:0.72rem; color:var(--ink-dim); margin-top:0.4rem;">Bos birakirsan AI gorseldeki temadan tahmin eder. Wall art secersen duvar sahnesi mockup'lari + duvar art description'i, mug secersen mutfak sahnesi + mug description uretir.</div>
     </div>
   </div>
 
@@ -970,6 +1022,7 @@
             <label>Y<input type="number" id="cY" oninput="calibFieldsToRect()"></label>
             <label>W<input type="number" id="cW" oninput="calibFieldsToRect()"></label>
             <label>H<input type="number" id="cH" oninput="calibFieldsToRect()"></label>
+            <label>Aci<input type="number" id="cRot" step="1" value="0" oninput="calibFieldsToRect()"></label>
             <label style="flex-direction:row;align-items:center;gap:0.4rem;font-size:0.72rem;cursor:pointer">
               <input type="checkbox" id="cAspectLock" checked onchange="calibAspectLockChanged()">
               Oran kilitli
@@ -983,6 +1036,9 @@
             <button class="pill-btn" onclick="calibAxis('w', -1)" title="W -">W -</button>
             <button class="pill-btn" onclick="calibAxis('h', 1)" title="H +">H +</button>
             <button class="pill-btn" onclick="calibAxis('h', -1)" title="H -">H -</button>
+            <button class="pill-btn" onclick="calibRotate(-5)" title="5 derece sola">&#8634; -5&deg;</button>
+            <button class="pill-btn" onclick="calibRotate(5)" title="5 derece saga">&#8635; +5&deg;</button>
+            <button class="pill-btn" onclick="calibRotate(0,true)" title="Aci sifirla">Aci 0</button>
             <span id="calibSaveStatus" style="margin-left:auto; align-self:center; font-size:0.85rem; color:var(--green); opacity:0; transition:opacity 200ms;"></span>
           </div>
         </div>
@@ -1291,9 +1347,9 @@
 
 <!-- Settings modal -->
 <div class="modal-bg" id="modal-settings" onclick="if(event.target===this) closeModal()">
-  <div class="modal">
+  <div class="modal" style="max-width:560px;">
     <h3>Ayarlar</h3>
-    <div class="modal-sub">Tarayici yolu ve CDP portu.</div>
+    <div class="modal-sub">Tarayici yolu, CDP portu ve her listing'e otomatik eklenen sabit gorseller.</div>
 
     <label>Tarayici yolu</label>
     <input type="text" id="setOpera" placeholder="Otomatik algilanir">
@@ -1302,7 +1358,19 @@
     <label>CDP portu</label>
     <input type="number" id="setCdpPort" value="9333">
 
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 0.5rem;">
+    <div style="margin-top:1.2rem; padding-top:1rem; border-top:1px solid var(--line);">
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <label style="margin:0; font-weight:600;">Sabit gorseller <span style="font-size:0.72rem; color:var(--ink-mid); font-weight:400;">(opsiyonel)</span></label>
+        <label class="pill-btn" style="cursor:pointer; font-size:0.78rem;">
+          + Gorsel ekle
+          <input type="file" id="tplUploadInput" accept="image/png,image/jpeg,image/webp" multiple style="display:none" onchange="tplUpload(event)">
+        </label>
+      </div>
+      <div class="field-hint" style="margin-top:0.25rem;">Mockup'lardan sonra Etsy'ye otomatik yuklenir (beden tablosu, kargo bilgisi, vs.). Sirala: surukle-birak.</div>
+      <div id="tplList" style="margin-top:0.6rem; display:flex; flex-wrap:wrap; gap:0.5rem; min-height:60px;"></div>
+    </div>
+
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 1rem;">
       <a href="/legacy" style="color:var(--ink-mid); font-size:0.85rem;">Eski arayuz</a>
       <div class="modal-actions">
         <button class="btn btn-ghost" style="min-height:40px; font-size:0.9rem;" onclick="closeModal()">Iptal</button>
@@ -1469,6 +1537,8 @@ function updateDesignStep() {
   // bulk: row editor visible, single dropArea hidden
   document.getElementById('bulkRowsWrap').style.display = isBulk ? '' : 'none';
   document.getElementById('dropArea').style.display = isBulk ? 'none' : '';
+  const pBox = document.getElementById('step2ProductTypeBox');
+  if (pBox) pBox.style.display = isPM ? '' : 'none';
   document.getElementById('bgChoice').style.display = isBulk ? 'none' : (state.ref ? 'flex' : 'none');
   if (isBulk) {
     if (!state.bulkRows.length) addBulkRow();
@@ -2271,6 +2341,92 @@ async function loadSettings() {
       ? 'Algilandi: ' + s.detected.name + ' (' + s.detected.path + ')'
       : 'Otomatik algilama basarisiz - yolu elle gir.';
   } catch {}
+  tplLoad();
+}
+
+// ── Sticky template images (sabit gorseller) ──
+async function tplLoad() {
+  const list = document.getElementById('tplList');
+  if (!list) return;
+  try {
+    const r = await fetch('/api/templates');
+    const items = await r.json();
+    if (!Array.isArray(items) || !items.length) {
+      list.innerHTML = '<div style="font-size:0.78rem; color:var(--ink-mid); padding:0.6rem 0;">Henuz sabit gorsel yok. Mockup\'lardan sonra Etsy\'ye eklenecek gorselleri ekle (beden tablosu, kargo, vs.)</div>';
+      return;
+    }
+    list.innerHTML = '';
+    items.forEach((it, i) => {
+      const card = document.createElement('div');
+      card.className = 'tpl-card';
+      card.draggable = true;
+      card.dataset.name = it.name;
+      card.style.cssText = 'position:relative; width:88px; height:88px; border-radius:10px; overflow:hidden; border:1px solid var(--line); background:var(--bg-soft); cursor:grab;';
+      card.innerHTML = '<img src="' + it.path + '?t=' + Date.now() + '" style="width:100%; height:100%; object-fit:cover; pointer-events:none;">' +
+        '<span style="position:absolute; left:4px; top:4px; background:rgba(0,0,0,0.6); color:#fff; font-size:0.65rem; padding:1px 5px; border-radius:6px;">' + (i + 1) + '</span>' +
+        '<button onclick="tplDelete(\'' + encodeURIComponent(it.name) + '\')" style="position:absolute; right:4px; top:4px; width:20px; height:20px; border-radius:50%; border:none; background:rgba(220,38,38,0.85); color:#fff; cursor:pointer; font-size:0.8rem; line-height:1; padding:0;" title="Sil">x</button>';
+      card.addEventListener('dragstart', tplDragStart);
+      card.addEventListener('dragover', tplDragOver);
+      card.addEventListener('drop', tplDrop);
+      card.addEventListener('dragend', tplDragEnd);
+      list.appendChild(card);
+    });
+  } catch (err) { toast('Sabit gorseller yuklenemedi'); }
+}
+
+async function tplUpload(e) {
+  const files = e.target.files;
+  if (!files || !files.length) return;
+  const fd = new FormData();
+  for (const f of files) fd.append('templates', f);
+  try {
+    const r = await fetch('/api/templates/upload', { method: 'POST', body: fd });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    toast(files.length + ' gorsel eklendi');
+    e.target.value = '';
+    tplLoad();
+  } catch (err) { toast('Yukleme basarisiz: ' + err.message); }
+}
+
+async function tplDelete(encName) {
+  if (!confirm('Bu sabit gorseli sil?')) return;
+  try {
+    const r = await fetch('/api/templates/' + encName, { method: 'DELETE' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    tplLoad();
+  } catch (err) { toast('Silinemedi'); }
+}
+
+let _tplDrag = null;
+function tplDragStart(e) {
+  _tplDrag = e.currentTarget;
+  e.currentTarget.style.opacity = '0.4';
+  try { e.dataTransfer.effectAllowed = 'move'; } catch {}
+}
+function tplDragOver(e) {
+  e.preventDefault();
+  try { e.dataTransfer.dropEffect = 'move'; } catch {}
+  const target = e.currentTarget;
+  if (!_tplDrag || target === _tplDrag) return;
+  const list = target.parentNode;
+  const rect = target.getBoundingClientRect();
+  const after = (e.clientX - rect.left) > rect.width / 2;
+  list.insertBefore(_tplDrag, after ? target.nextSibling : target);
+}
+function tplDrop(e) { e.preventDefault(); }
+async function tplDragEnd(e) {
+  e.currentTarget.style.opacity = '1';
+  _tplDrag = null;
+  const list = document.getElementById('tplList');
+  const order = Array.from(list.querySelectorAll('.tpl-card')).map(c => c.dataset.name);
+  if (!order.length) return;
+  try {
+    await fetch('/api/templates/reorder', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order }),
+    });
+    tplLoad();
+  } catch (err) { toast('Sira kaydedilemedi'); }
 }
 async function saveSettings() {
   const operaPath = document.getElementById('setOpera').value.trim();
@@ -2311,6 +2467,10 @@ function _buildFd(designFile) {
     const cnt = cntFromThemes || parseInt(document.getElementById('aiMockupCount')?.value || '4', 10);
     fd.append('mockupCount', String(Math.max(1, Math.min(cnt, 40))));
     if (themes.length) fd.append('themes', JSON.stringify(themes));
+    const pType = document.getElementById('productType')?.value?.trim() || '';
+    const pDetail = document.getElementById('productDetail')?.value?.trim() || '';
+    if (pType) fd.append('productType', pType);
+    if (pDetail) fd.append('productDetail', pDetail);
   } else {
     state.mockupFiles.forEach(f => fd.append('mockups', f));
     if (state.selectedLibrary.size) fd.append('libraryMockups', Array.from(state.selectedLibrary).join(','));
@@ -2853,9 +3013,11 @@ async function calibInit() {
     } else if (state.mode === 'bulk' && state.bulkRows) {
       const used = new Set();
       state.bulkRows.forEach(row => {
-        if (row && row.selectedLibrary) row.selectedLibrary.forEach(n => used.add(n));
+        if (!row) return;
+        if (Array.isArray(row.mockupNames)) row.mockupNames.forEach(n => used.add(n));
+        if (row.selectedLibrary) row.selectedLibrary.forEach(n => used.add(n));
       });
-      if (used.size > 0) templates = templates.filter(t => used.has(t.name));
+      templates = templates.filter(t => used.has(t.name));
     }
     calib.templates = templates;
     const cal = calib.templates.filter(t => t.calibrated).length;
@@ -2921,6 +3083,7 @@ async function calibSelect(name) {
           y: pos.y || 0,
           w: (pos.width || pos.w) || Math.round(calib.meta.width * 0.4),
           h: (pos.height || pos.h) || Math.round(calib.meta.height * 0.4),
+          rot: pos.rotation || 0,
         };
       } else {
         calib.rect = {
@@ -2928,13 +3091,14 @@ async function calibSelect(name) {
           y: Math.round(calib.meta.height * 0.3),
           w: Math.round(calib.meta.width * 0.4),
           h: Math.round(calib.meta.height * 0.4),
+          rot: 0,
         };
       }
       applyARtoRect();
       writeCalibFields();
       updateCalibRect();
     }).catch(() => {
-      calib.rect = { x: 0, y: 0, w: Math.round(calib.meta.width * 0.4), h: Math.round(calib.meta.height * 0.4) };
+      calib.rect = { x: 0, y: 0, w: Math.round(calib.meta.width * 0.4), h: Math.round(calib.meta.height * 0.4), rot: 0 };
       applyARtoRect();
       writeCalibFields(); updateCalibRect();
     });
@@ -2946,6 +3110,8 @@ function writeCalibFields() {
   document.getElementById('cY').value = calib.rect.y;
   document.getElementById('cW').value = calib.rect.w;
   document.getElementById('cH').value = calib.rect.h;
+  const rotEl = document.getElementById('cRot');
+  if (rotEl) rotEl.value = calib.rect.rot || 0;
 }
 function applyARtoRect() {
   if (!state.designAR || !calib.meta) return;
@@ -2966,6 +3132,8 @@ function calibFieldsToRect() {
   calib.rect.y = parseInt(document.getElementById('cY').value) || 0;
   const w = parseInt(document.getElementById('cW').value) || 0;
   const h = parseInt(document.getElementById('cH').value) || 0;
+  const rotEl = document.getElementById('cRot');
+  calib.rect.rot = rotEl ? (parseFloat(rotEl.value) || 0) : (calib.rect.rot || 0);
   const lockEl = document.getElementById('cAspectLock');
   const locked = lockEl ? lockEl.checked : true;
   calib.rect.w = w;
@@ -3049,6 +3217,22 @@ function updateCalibRect() {
   r.style.top = (offsetY + calib.rect.y * scaleY) + 'px';
   r.style.width = (calib.rect.w * scaleX) + 'px';
   r.style.height = (calib.rect.h * scaleY) + 'px';
+  const rot = calib.rect.rot || 0;
+  r.style.transform = rot ? `rotate(${rot}deg)` : '';
+  r.style.transformOrigin = 'center center';
+}
+
+function calibRotate(deg, reset) {
+  if (reset) {
+    calib.rect.rot = 0;
+  } else {
+    let cur = calib.rect.rot || 0;
+    cur = ((cur + deg) % 360 + 360) % 360;
+    if (cur > 180) cur -= 360;
+    calib.rect.rot = cur;
+  }
+  writeCalibFields();
+  updateCalibRect();
 }
 
 // Drag/resize the rectangle
@@ -3145,7 +3329,7 @@ async function calibSave() {
   try {
     const r = await fetch('/api/mockup-positions', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ template: saveKey, x, y, width: w, height: h, source: 'manual' }),
+      body: JSON.stringify({ template: saveKey, x, y, width: w, height: h, rotation: calib.rect.rot || 0, source: 'manual' }),
     });
     if (!r.ok) throw new Error('save failed');
     const st = document.getElementById('calibSaveStatus');
@@ -3167,7 +3351,7 @@ async function calibAutoSingle() {
     });
     const d = await r.json();
     if (d.ok && d.position) {
-      calib.rect = { x: d.position.x, y: d.position.y, w: d.position.width, h: d.position.height };
+      calib.rect = { x: d.position.x, y: d.position.y, w: d.position.width, h: d.position.height, rot: d.position.rotation || 0 };
       writeCalibFields(); updateCalibRect();
       const tpl = calib.templates.find(t => t.name === calib.selected);
       if (tpl) { tpl.calibrated = true; tpl.source = 'auto'; }
@@ -3191,11 +3375,222 @@ async function calibBatchAuto() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// ── Yarim kalan isler ──
+// ═══════════════════════════════════════════════════════════════
+let interruptedJobs = [];
+let resumingAll = false;
+const STEP_ORDER = ['generate', 'mockup', 'tags', 'upload', 'pinterest'];
+const STEP_LABEL = { generate: 'Tasarim', mockup: 'Mockup', tags: 'Etiket', upload: 'Yukleme', pinterest: 'Pinterest' };
+
+async function loadInterruptedJobs() {
+  try {
+    const r = await fetch('/api/jobs?status=paused,interrupted,failed');
+    if (!r.ok) return;
+    const all = await r.json();
+    const filtered = all.filter(j => j.currentStep !== 'placement');
+    filtered.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    interruptedJobs = filtered.slice(0, 20);
+    renderInterruptedJobs();
+  } catch {}
+}
+
+function renderInterruptedJobs() {
+  const panel = document.getElementById('interruptedPanel');
+  const list = document.getElementById('interruptedList');
+  const summary = document.getElementById('interruptedSummary');
+  if (!panel || !list || !summary) return;
+  if (interruptedJobs.length === 0) {
+    panel.style.display = 'none';
+    return;
+  }
+  panel.style.display = '';
+  const withMockups = interruptedJobs.filter(j => (j.mockupPaths || []).length > 0).length;
+  summary.textContent = 'Son ' + interruptedJobs.length + ' is gosteriliyor. ' + withMockups + ' tanesinde mockup hazir. AI ile tag/baslik uretilecek.';
+  list.innerHTML = interruptedJobs.map((j, i) => bulkLikeCard(j, i)).join('');
+}
+
+function bulkLikeCard(j, i) {
+  const modeLabel = { single: 'Tek tasarim', 'front-back': 'On - Arka', 'product-mockup': 'AI Mockup', bulk: 'Toplu' }[j.mode] || j.mode || 'Tek';
+  const completed = j.completedSteps || [];
+  const thumbs = (j.mockupPaths || []).slice(0, 6).map(p =>
+    '<img src="' + p + '" loading="lazy" style="width:42px;height:42px;object-fit:cover;border-radius:8px;border:1px solid var(--line);">'
+  ).join('');
+  const designThumb = j.designPath ? '<img src="' + j.designPath + '" loading="lazy" style="width:42px;height:42px;object-fit:cover;border-radius:8px;border:1px solid var(--line);">' : '';
+  const stepDots = STEP_ORDER.map(s => {
+    const done = completed.includes(s);
+    const cur = !done && s === nextStepFor(completed);
+    const bg = done ? 'var(--green)' : (cur ? 'var(--accent)' : 'var(--line)');
+    const fg = done || cur ? '#fff' : 'var(--ink-mid)';
+    return '<span style="font-size:0.65rem; padding:0.15rem 0.5rem; border-radius:999px; background:' + bg + '; color:' + fg + ';">' + STEP_LABEL[s] + '</span>';
+  }).join('');
+  const errLine = j.error
+    ? '<div style="font-size:0.72rem; color:var(--red); margin-top:0.25rem;">' + j.error + '</div>'
+    : '';
+  return '<div id="iJob-' + i + '" data-status="pending" style="background:var(--bg-card); border:1px solid var(--line); border-radius:14px; padding:0.8rem 0.9rem;">' +
+    '<div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.6rem;">' +
+      '<span style="font-weight:600; color:var(--ink); font-size:0.92rem;">Urun #' + (i + 1) + '</span>' +
+      '<span style="font-size:0.7rem; padding:0.18rem 0.5rem; border-radius:999px; background:var(--bg-soft); color:var(--ink-mid);">' + modeLabel + '</span>' +
+      '<span id="iJobStatus-' + i + '" style="margin-left:auto; font-size:0.75rem; color:var(--ink-mid);">Bekliyor</span>' +
+      '<button class="pill-btn" onclick="resumeOneInterrupted(' + i + ')" style="font-size:0.72rem;">Devam</button>' +
+      '<button onclick="deleteInterruptedJob(\'' + j.sku + '\')" style="width:26px; height:26px; border-radius:50%; border:0; background:var(--bg-soft); color:var(--ink-mid); cursor:pointer; font-size:1rem;" title="Sil">&times;</button>' +
+    '</div>' +
+    '<div style="display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">' +
+      designThumb +
+      (designThumb && thumbs ? '<span style="color:var(--ink-dim); font-size:0.85rem;">+</span>' : '') +
+      thumbs +
+    '</div>' +
+    '<div style="display:flex; gap:0.3rem; flex-wrap:wrap; margin-top:0.55rem;">' + stepDots + '</div>' +
+    '<div style="font-size:0.7rem; color:var(--ink-dim); margin-top:0.35rem;">' + j.sku + '</div>' +
+    errLine +
+  '</div>';
+}
+
+function setJobRowStatus(i, text, kind) {
+  const el = document.getElementById('iJobStatus-' + i);
+  if (!el) return;
+  const colorMap = { pending: 'var(--ink-mid)', running: 'var(--accent-deep)', done: 'var(--green)', failed: 'var(--red)' };
+  el.textContent = text;
+  el.style.color = colorMap[kind] || 'var(--ink-mid)';
+  const card = document.getElementById('iJob-' + i);
+  if (card) card.dataset.status = kind || 'pending';
+}
+
+async function deleteInterruptedJob(sku) {
+  if (!confirm(sku + ' silinsin mi?')) return;
+  try {
+    await fetch('/api/job/' + encodeURIComponent(sku), { method: 'DELETE' });
+    loadInterruptedJobs();
+  } catch { toast('Silinemedi'); }
+}
+
+function nextStepFor(completed) {
+  for (const s of STEP_ORDER) if (!completed.includes(s)) return s;
+  return null;
+}
+
+async function resumeOneInterrupted(idx) {
+  const j = interruptedJobs[idx];
+  if (!j) return;
+  setJobRowStatus(idx, 'Calisiyor...', 'running');
+  try {
+    await runResumeJob(j, idx);
+    setJobRowStatus(idx, 'Tamamlandi', 'done');
+  } catch (e) {
+    setJobRowStatus(idx, 'Hata: ' + e.message, 'failed');
+  }
+}
+
+async function resumeAllInterrupted() {
+  if (resumingAll || interruptedJobs.length === 0) return;
+  resumingAll = true;
+
+  // Toplu moddaki gibi progress ekranina gec
+  state.mode = state.mode || 'single';
+  showStep('progress');
+  ['generate', 'mockup', 'tags', 'upload'].forEach(s => setProgressStep(s, null));
+  document.getElementById('liveLog').textContent = '';
+  document.getElementById('liveDesignCard').style.display = 'none';
+  document.getElementById('liveMockupsCard').style.display = 'none';
+  document.getElementById('liveTitleCard').style.display = 'none';
+  document.getElementById('liveTagsCard').style.display = 'none';
+  document.getElementById('liveDescCard').style.display = 'none';
+  document.getElementById('liveGrid').innerHTML = '';
+
+  const queue = interruptedJobs.slice();
+  let ok = 0, fail = 0;
+  for (let i = 0; i < queue.length; i++) {
+    const j = queue[i];
+    logLine('━━━━━━━ [' + (i + 1) + '/' + queue.length + '] ' + j.sku + ' (' + (j.mode || 'single') + ') ━━━━━━━');
+    ['generate', 'mockup', 'tags', 'upload'].forEach(s => setProgressStep(s, null));
+    state.producedMockups = []; state.producedDesign = null; state.producedTitle = '';
+    state.producedDescription = ''; state.producedTags = [];
+    state.producedListingUrl = '';
+    document.getElementById('liveDesignCard').style.display = 'none';
+    document.getElementById('liveMockupsCard').style.display = 'none';
+    document.getElementById('liveGrid').innerHTML = '';
+    try {
+      await runResumeJob(j, i, true);
+      ok++;
+    } catch (e) {
+      fail++;
+      logLine('HATA (' + j.sku + '): ' + e.message);
+    }
+  }
+  logLine('━━━ Toplu tamamlandi: ' + ok + ' basarili, ' + fail + ' hatali ━━━');
+  resumingAll = false;
+  finishCreate();
+  await loadInterruptedJobs();
+}
+
+async function runResumeJob(job, rowIdx, useLiveProgress) {
+  const r = await fetch('/api/job/' + encodeURIComponent(job.sku) + '/resume', { method: 'POST' });
+  if (!r.ok) throw new Error('Resume verisi alinamadi');
+  const data = await r.json();
+
+  const nextStep = nextStepFor(data.completedSteps || []);
+  if (!nextStep) throw new Error('Tamamlanmis is');
+
+  const continueMap = { mockup: 'placement-approve', tags: 'mockup-approve', upload: 'upload', pinterest: 'pinterest' };
+  const continueFrom = continueMap[nextStep] || nextStep;
+
+  const fd = new FormData();
+  fd.append('mode', data.mode || 'single');
+  fd.append('sku', data.sku);
+  fd.append('resumeFrom', nextStep);
+  fd.append('continueFrom', continueFrom);
+  if (data.designPath) fd.append('existingDesign', data.designPath);
+  if (data.backDesignPath) fd.append('existingBackDesign', data.backDesignPath);
+  if ((data.mockupPaths || []).length) fd.append('existingMockups', data.mockupPaths.join(','));
+  if ((data.tags || []).length) fd.append('existingTags', data.tags.join(','));
+  if (data.title) fd.append('existingTitle', data.title);
+  if (data.description) fd.append('existingDescription', data.description);
+  if (data.listingUrl) fd.append('existingListingUrl', data.listingUrl);
+  fd.append('fullAuto', '1');
+  // Tag/baslik bos kalmasin diye AI fallback'i zorla
+  if (!data.title || !(data.tags || []).length) {
+    fd.append('tagSource', 'ai');
+    fd.append('titleSource', 'image-analyze');
+  }
+
+  const res = await fetch('/api/create', { method: 'POST', body: fd });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = '';
+  let lastErr = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const blocks = buf.split('\n\n'); buf = blocks.pop();
+    for (const b of blocks) {
+      const dline = b.split('\n').find(l => l.startsWith('data: '));
+      if (!dline) continue;
+      try {
+        const ev = JSON.parse(dline.slice(6));
+        if (useLiveProgress) {
+          try { handleEvent(ev); } catch {}
+        }
+        if (ev.type === 'step-start' && typeof rowIdx === 'number') {
+          setJobRowStatus(rowIdx, STEP_LABEL[ev.step] || ev.step, 'running');
+        } else if (ev.type === 'step-error' || ev.type === 'error') {
+          lastErr = ev.message || lastErr;
+        } else if (ev.type === 'pause' && typeof rowIdx === 'number') {
+          setJobRowStatus(rowIdx, 'Beklemede: ' + (ev.message || ev.step), 'failed');
+        }
+      } catch {}
+    }
+  }
+  if (lastErr) throw new Error(lastErr);
+}
+
+// ═══════════════════════════════════════════════════════════════
 // ── Init ──
 // ═══════════════════════════════════════════════════════════════
 refreshStatus();
 setInterval(refreshStatus, 6000);
 showStep(1);
+loadInterruptedJobs();
 
 // Deep link via hash (e.g. /#stats from another page)
 (function () {

@@ -13,7 +13,8 @@ const { extractKeywords } = require('./tag-lab/extract-keywords');
 const { analyzeMockup } = require('./lib/analyze-mockup');
 const { generateMockupFromImage } = require('./lib/generate-mockup-from-image');
 const { generateLifestyleMockups } = require('./lib/lifestyle-mockup');
-const { generateDescription, wrapWithTemplate, optimizeTags, generateAltTexts } = require('./lib/optimize');
+const { generateDescription, wrapWithTemplate, optimizeTags, enforceThirteenTags, generateAltTexts } = require('./lib/optimize');
+const { generateAiDescription, appendCommonFooter } = require('./lib/ai-description');
 const { uploadToEtsy } = require('./lib/upload-etsy');
 const { pinToPinterest } = require('./lib/pin-to-pinterest');
 const { uploadToEtsyWithCookies } = require('./lib/upload-etsy-cookies');
@@ -665,6 +666,7 @@ app.use(express.static(path.join(APP_ROOT, 'public'), { etag: false, maxAge: 0, 
 app.use('/designs', express.static(path.join(APP_ROOT, 'designs')));
 app.use('/output', express.static(path.join(APP_ROOT, 'output')));
 app.use('/mockups', express.static(path.join(APP_ROOT, 'mockups')));
+app.use('/templates', express.static(path.join(APP_ROOT, 'templates')));
 
 // Cookie storage (file-based, no auth needed)
 const COOKIES_FILE = path.join(APP_ROOT, 'data', 'cookies.json');
@@ -929,6 +931,95 @@ app.delete('/api/mockups/:name', (req, res) => {
   }
 });
 
+// ── Sticky template images (sabit gorseller) ──
+// Files in templates/ get appended to every Etsy listing after the mockups,
+// sorted by numeric prefix (1.webp, 2.webp, ...). Used for size charts,
+// shipping info, care instructions, etc.
+const TEMPLATES_DIR = path.join(APP_ROOT, 'templates');
+
+function listTemplates() {
+  if (!fs.existsSync(TEMPLATES_DIR)) return [];
+  return fs.readdirSync(TEMPLATES_DIR)
+    .filter(f => /\.(webp|png|jpg|jpeg)$/i.test(f))
+    .sort((a, b) => (parseInt(a) || 9999) - (parseInt(b) || 9999))
+    .map(name => {
+      const full = path.join(TEMPLATES_DIR, name);
+      let size = 0;
+      try { size = fs.statSync(full).size; } catch {}
+      return { name, path: '/templates/' + name, size };
+    });
+}
+
+function nextTemplateIndex() {
+  if (!fs.existsSync(TEMPLATES_DIR)) return 1;
+  const nums = fs.readdirSync(TEMPLATES_DIR)
+    .map(f => parseInt(f))
+    .filter(n => !isNaN(n));
+  return nums.length ? Math.max(...nums) + 1 : 1;
+}
+
+app.get('/api/templates', (req, res) => {
+  try { res.json(listTemplates()); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/templates/upload', upload.array('templates', 20), (req, res) => {
+  if (!fs.existsSync(TEMPLATES_DIR)) fs.mkdirSync(TEMPLATES_DIR, { recursive: true });
+  let nextIdx = nextTemplateIndex();
+  const saved = [];
+  for (const file of req.files || []) {
+    let ext = (path.extname(file.originalname) || '.webp').toLowerCase();
+    if (!/^\.(webp|png|jpg|jpeg)$/.test(ext)) ext = '.webp';
+    const name = nextIdx + ext;
+    const dest = path.join(TEMPLATES_DIR, name);
+    try {
+      fs.renameSync(file.path, dest);
+      saved.push({ name, path: '/templates/' + name });
+      nextIdx++;
+    } catch (err) {
+      try { fs.unlinkSync(file.path); } catch {}
+    }
+  }
+  res.json({ ok: true, saved, all: listTemplates() });
+});
+
+app.delete('/api/templates/:name', (req, res) => {
+  const safeName = path.basename(req.params.name);
+  const filePath = path.join(TEMPLATES_DIR, safeName);
+  if (fs.existsSync(filePath)) {
+    try { fs.unlinkSync(filePath); res.json({ ok: true, all: listTemplates() }); }
+    catch (err) { res.status(500).json({ error: err.message }); }
+  } else {
+    res.status(404).json({ error: 'Not found' });
+  }
+});
+
+// Reorder: caller posts { order: ['3.webp', '1.webp', '5.webp', ...] }, files
+// get renumbered to match the new sequence (1, 2, 3, ...). Two-pass rename
+// via temp names so we never collide.
+app.post('/api/templates/reorder', express.json(), (req, res) => {
+  const order = Array.isArray(req.body.order) ? req.body.order : [];
+  if (!order.length) return res.status(400).json({ error: 'order array gerekli' });
+  try {
+    const temps = [];
+    order.forEach((name, i) => {
+      const safe = path.basename(name);
+      const src = path.join(TEMPLATES_DIR, safe);
+      if (!fs.existsSync(src)) return;
+      const tmp = path.join(TEMPLATES_DIR, '__reorder_' + i + path.extname(safe));
+      fs.renameSync(src, tmp);
+      temps.push({ tmp, finalIdx: i + 1, ext: path.extname(safe) });
+    });
+    temps.forEach(t => {
+      const final = path.join(TEMPLATES_DIR, t.finalIdx + t.ext);
+      fs.renameSync(t.tmp, final);
+    });
+    res.json({ ok: true, all: listTemplates() });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Helper: rename uploaded file with proper extension
 function renameWithExt(file) {
   const ext = path.extname(file.originalname) || '.png';
@@ -1006,13 +1097,24 @@ app.get('/api/calibrate/status', (req, res) => {
     const templates = fs.readdirSync(MOCKUPS_DIR).filter(f => /\.(jpg|jpeg|png|webp|avif)$/i.test(f));
     let positions = {};
     try { positions = JSON.parse(fs.readFileSync(POSITIONS_FILE, 'utf8')); } catch {}
+    const presets = loadPresets();
+    const usage = presets.mockupUsage || {};
+    const favSet = new Set(presets.favorites?.mockups || []);
     const list = templates.map(name => {
       const pos = positions[name];
       const norm = pos ? normalizePos(pos) : null;
-      return { name, calibrated: !!pos, source: norm?.source || null };
+      return {
+        name,
+        calibrated: !!pos,
+        source: norm?.source || null,
+        usageCount: usage[name]?.count || 0,
+        lastUsed: usage[name]?.lastUsed || 0,
+        favorited: favSet.has(name),
+      };
     });
     const calibrated = list.filter(t => t.calibrated).length;
-    res.json({ total: list.length, calibrated, uncalibrated: list.length - calibrated, templates: list });
+    const used = list.filter(t => t.usageCount > 0 || t.favorited).length;
+    res.json({ total: list.length, calibrated, uncalibrated: list.length - calibrated, used, templates: list });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1305,8 +1407,8 @@ Output ONLY a JSON array of 13 strings, nothing else. Example: ["tag1","tag2",..
     }
     // Extract JSON array from response
     const match = content.match(/\[[\s\S]*?\]/);
-    const tags = match ? JSON.parse(match[0]) : [];
-    res.json({ tags: tags.slice(0, 13) });
+    const rawTags = match ? JSON.parse(match[0]) : [];
+    res.json({ tags: enforceThirteenTags(rawTags, title) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1449,6 +1551,8 @@ app.post('/api/create',
     const etsyhuntKeyword = (req.body.etsyhuntKeyword || '').trim();
     const titleSource = req.body.titleSource || 'scrape'; // 'scrape' | 'image-analyze'
     const imgMockupCount = Math.max(1, Math.min(parseInt(req.body.mockupCount || req.body.imgMockupCount || '3', 10) || 3, 6));
+    const productType = (req.body.productType || '').trim();
+    const productDetail = (req.body.productDetail || '').trim();
 
     // Library mockups: resolve paths from mockups/ directory
     const libraryMockupPaths = (req.body.libraryMockups || '')
@@ -1674,9 +1778,12 @@ app.post('/api/create',
             const productDescription = themeWords.length ? themeWords.slice(0, 8).join(', ') : 'product from uploaded photo';
             let themesSpec = null;
             try { themesSpec = req.body.themes ? JSON.parse(req.body.themes) : null; } catch {}
+            if (productType) send({ type: 'log', message: '[mockup-type] ' + productType + (productDetail ? ' / ' + productDetail : '') });
             const lsResult = await generateLifestyleMockups({
               productImagePath: designPath,
               productDescription,
+              productType,
+              productDetail,
               themeWords,
               themes: Array.isArray(themesSpec) && themesSpec.length ? themesSpec : undefined,
               sku,
@@ -1852,6 +1959,26 @@ app.post('/api/create',
       let title = '';
       let description = '';
 
+      // For image-to-mockup mode, swap the t-shirt boilerplate description for
+      // an AI-written one keyed off productType. Other modes keep the legacy
+      // tee/sweatshirt template.
+      const buildProductDescription = async (rawIntro) => {
+        send({ type: 'log', message: '[desc-helper] mode=' + mode + ' productType=' + (productType || '(empty)') + ' rawIntroLen=' + (rawIntro ? rawIntro.length : 0) });
+        if (mode !== 'product-mockup') {
+          send({ type: 'log', message: '[desc-helper] -> wrapWithTemplate (legacy tee template) — mode is not product-mockup!' });
+          return wrapWithTemplate(rawIntro || '', title);
+        }
+        try {
+          send({ type: 'log', message: '[ai-desc] ' + (productType || 'auto') + ' icin description yaziliyor...' });
+          const aiIntro = await generateAiDescription({ productType, productDetail, title, tags, apiKey: req.apiKey });
+          send({ type: 'log', message: '[ai-desc] OK len=' + (aiIntro ? aiIntro.length : 0) + ' prefix="' + (aiIntro || '').slice(0, 60).replace(/\n/g, ' ') + '"' });
+          return appendCommonFooter(aiIntro, title);
+        } catch (err) {
+          send({ type: 'log', message: '[ai-desc] hata: ' + err.message + ' (fallback intro)' });
+          return appendCommonFooter(rawIntro || '', title);
+        }
+      };
+
       console.log(`  [tags] shouldRun=${shouldRun('tags')}, competitor=${competitor ? competitor.substring(0, 40) : 'NULL'}, skipTags=${skipTags}, existingTags=${existingTags ? 'YES' : 'NULL'}`);
 
       if (continueFrom === 'pinterest') {
@@ -1899,6 +2026,8 @@ app.post('/api/create',
             imageBuffer, mime,
             apiKey: req.apiKey || process.env.OPENROUTER_API_KEY,
             targetCount: 13,
+            productType: mode === 'product-mockup' ? productType : null,
+            productDetail: mode === 'product-mockup' ? productDetail : '',
             onLog: (message) => send({ type: 'log', message: '[tag-lab] ' + message }),
             onKeywords: (kws, retry) => send({ type: 'log', message: '[tag-lab] keywords' + (retry ? ' (retry)' : '') + ': ' + kws.join(' | ') }),
             onResult: (kw, count, _top, error) => send({ type: 'log', message: '[tag-lab] "' + kw + '" -> ' + count + ' row' + (error ? ' (' + error + ')' : '') }),
@@ -1908,7 +2037,7 @@ app.post('/api/create',
           if (!result.tags || result.tags.length === 0) {
             send({ type: 'step-error', step: 'tags', message: 'Tag Lab: tag bulunamadi' });
           } else {
-            tags = result.tags;
+            tags = enforceThirteenTags(result.tags, result.title || title, mode === 'product-mockup' ? productType : null);
             send({ type: 'step-done', step: 'tags', message: 'Tag Lab: ' + tags.length + ' tag' });
             send({ type: 'tags', tags });
             meta.tags = tags;
@@ -1917,8 +2046,8 @@ app.post('/api/create',
               meta.title = title;
               send({ type: 'title', title });
             }
-            if (result.description) {
-              description = wrapWithTemplate(result.description, title);
+            if (result.description || mode === 'product-mockup') {
+              description = await buildProductDescription(result.description);
               meta.description = description;
               send({ type: 'description', description });
             }
@@ -1940,19 +2069,27 @@ app.post('/api/create',
             throw new Error('Mockup veya design image bulunamadi');
           }
           send({ type: 'log', message: '[ai] kaynak: ' + path.basename(sourceImagePath) });
-          const analysis = await analyzeMockup(sourceImagePath, { apiKey: req.apiKey, includeTags: true });
-          if (analysis.tags && analysis.tags.length) {
-            tags = analysis.tags;
-            meta.tags = tags;
-            send({ type: 'tags', tags });
-          }
+          const analysis = await analyzeMockup(sourceImagePath, {
+            apiKey: req.apiKey, includeTags: true,
+            productType: mode === 'product-mockup' ? productType : null,
+            productDetail: mode === 'product-mockup' ? productDetail : '',
+          });
           if (analysis.title) {
             title = analysis.title;
             meta.title = title;
             send({ type: 'title', title });
           }
-          if (analysis.description) {
-            description = wrapWithTemplate(analysis.description, title);
+          if (analysis.tags && analysis.tags.length) {
+            tags = enforceThirteenTags(analysis.tags, title, mode === 'product-mockup' ? productType : null);
+            meta.tags = tags;
+            send({ type: 'tags', tags });
+          } else {
+            tags = enforceThirteenTags([], title, mode === 'product-mockup' ? productType : null);
+            meta.tags = tags;
+            send({ type: 'tags', tags });
+          }
+          if (analysis.description || mode === 'product-mockup') {
+            description = await buildProductDescription(analysis.description);
             meta.description = description;
             send({ type: 'description', description });
           }
@@ -1984,9 +2121,11 @@ app.post('/api/create',
           }
           const rawCount = result.rawTagCount || 0;
           if (rawCount > 0 && result.tags && result.tags.length > 0) {
-            tags = result.tags;
             title = result.title;
-            description = result.description;
+            tags = enforceThirteenTags(result.tags, title, mode === 'product-mockup' ? productType : null);
+            description = mode === 'product-mockup'
+              ? await buildProductDescription(result.description)
+              : result.description;
             tagSuccess = true;
             send({ type: 'step-done', step: 'tags', message: `${tags.length} tags (${rawCount} scraped), description ready` });
           } else {
@@ -2027,9 +2166,11 @@ app.post('/api/create',
               const match = content.match(/\[[\s\S]*?\]/);
               const aiTags = match ? JSON.parse(match[0]).slice(0, 13) : [];
               if (aiTags.length > 0) {
-                tags = aiTags;
-                title = await generateSEOTitle(slugTitle, tags, req.apiKey);
-                description = generateDescription(title, tags);
+                title = await generateSEOTitle(slugTitle, aiTags, req.apiKey);
+                tags = enforceThirteenTags(aiTags, title, mode === 'product-mockup' ? productType : null);
+                description = mode === 'product-mockup'
+                  ? await buildProductDescription(null)
+                  : generateDescription(title, tags);
                 send({ type: 'step-done', step: 'tags', message: `AI fallback: ${tags.length} tag uretildi` });
                 send({ type: 'tags', tags });
                 send({ type: 'title', title });
@@ -2054,21 +2195,34 @@ app.post('/api/create',
       }
 
       // Image-analyze: override title/description by analyzing the first mockup
-      // (skipped when Tag Lab or AI pipeline already produced title/description)
-      if (titleSource === 'image-analyze' && shouldRun('tags') && mockupOutputs.length > 0 && !skipTags && !((tagSource === 'etsyhunt' || tagSource === 'ai') && title && description)) {
+      // (skipped when Tag Lab or AI pipeline already produced title/description).
+      // For product-mockup mode this ALWAYS runs so the t-shirt-flavoured Alura
+      // result is replaced by a wall-art / mug / candle / etc analysis.
+      const forceImageAnalyze = mode === 'product-mockup' && shouldRun('tags') && mockupOutputs.length > 0 && !skipTags
+        && !((tagSource === 'etsyhunt' || tagSource === 'ai') && title && description);
+      if ((titleSource === 'image-analyze' && shouldRun('tags') && mockupOutputs.length > 0 && !skipTags && !((tagSource === 'etsyhunt' || tagSource === 'ai') && title && description)) || forceImageAnalyze) {
         send({ type: 'step-start', step: 'analyze', message: 'Mockup analiz ediliyor (Gemini)...' });
         try {
-          const analysis = await analyzeMockup(mockupOutputs[0], { tags, apiKey: req.apiKey, includeTags: true });
+          // For product-mockup with productType set, drop tee-flavoured tagsHint
+          // so the analyser isn't biased by the Alura competitor's apparel tags.
+          const hintTags = (mode === 'product-mockup' && productType) ? [] : tags;
+          const analysis = await analyzeMockup(mockupOutputs[0], {
+            tags: hintTags, apiKey: req.apiKey, includeTags: true,
+            productType: mode === 'product-mockup' ? productType : null,
+            productDetail: mode === 'product-mockup' ? productDetail : '',
+          });
           if (analysis.title) {
             title = analysis.title;
             send({ type: 'title', title });
           }
-          if (analysis.description) {
-            description = wrapWithTemplate(analysis.description, title);
+          if (analysis.description || mode === 'product-mockup') {
+            description = await buildProductDescription(analysis.description);
             send({ type: 'description', description });
           }
-          if (analysis.tags && analysis.tags.length && (!tags || tags.length === 0)) {
-            tags = analysis.tags;
+          // In product-mockup mode also REPLACE existing tags with analyser output
+          // (Alura's tee tags get swapped for wall-art / mug / etc tags).
+          if (analysis.tags && analysis.tags.length && (mode === 'product-mockup' || !tags || tags.length === 0)) {
+            tags = enforceThirteenTags(analysis.tags, title, mode === 'product-mockup' ? productType : null);
             send({ type: 'tags', tags });
           }
           send({ type: 'step-done', step: 'analyze', message: 'Title, description, tags gorsel analizinden olusturuldu' });
@@ -2098,6 +2252,23 @@ app.post('/api/create',
         pipelineLock = false;
         return res.end();
       }
+      // SAFETY NET (product-mockup only): the tee/sweatshirt boilerplate must
+      // NEVER appear when the seller picked a non-apparel productType. Whatever
+      // path set description, scrub the boilerplate before the UI sees it.
+      if (mode === 'product-mockup' && description) {
+        const teeMarkers = /\n*AVAILABLE STYLES|T-SHIRT[\s\S]{0,40}Gildan|SWEATSHIRT[\s\S]{0,40}Gildan|Gildan\s*\d{4,5}/i;
+        const m = description.match(teeMarkers);
+        if (m && typeof m.index === 'number') {
+          const cleanIntro = description.slice(0, m.index).trim();
+          send({ type: 'log', message: '[desc-safety] tee/Gildan boilerplate tespit edildi (idx=' + m.index + '), kaldiriliyor' });
+          description = appendCommonFooter(cleanIntro, title);
+          meta.description = description;
+          saveMeta();
+          updateJob(sku, { description });
+          send({ type: 'description', description });
+        }
+      }
+
       // ── Pause after tags (manual mode) ──
       if (!fullAuto && continueFrom !== 'upload' && continueFrom !== 'upload-and-pin' && continueFrom !== 'pinterest' && tags.length > 0 && title) {
         updateJob(sku, { status: 'paused', currentStep: 'tags', completedSteps: ['generate', 'mockup', 'tags'], mockupPaths: mockupOutputs.map(p => '/output/' + path.basename(p)) });
@@ -2143,6 +2314,28 @@ app.post('/api/create',
           send({ type: 'done' });
           cleanup(allTempFiles);
           return res.end();
+        }
+        // Final safety net: hicbir kosulda 13'ten az tag ile yukleme yapilmaz.
+        if (!Array.isArray(tags) || tags.length !== 13) {
+          tags = enforceThirteenTags(tags || [], title, mode === 'product-mockup' ? productType : null);
+          meta.tags = tags;
+          saveMeta();
+          send({ type: 'tags', tags });
+        }
+        // SAFETY NET: in product-mockup mode the description must NEVER contain
+        // the tee/sweatshirt boilerplate. If it leaked in through any pipeline
+        // path, strip it and re-attach the generic non-apparel footer.
+        if (mode === 'product-mockup' && description) {
+          const teeMarkers = /\n*AVAILABLE STYLES|T-SHIRT[\s\S]*?Gildan|SWEATSHIRT[\s\S]*?Gildan/i;
+          const m = description.match(teeMarkers);
+          if (m && typeof m.index === 'number') {
+            const cleanIntro = description.slice(0, m.index).trim();
+            send({ type: 'log', message: '[desc-safety] tee boilerplate tespit edildi (idx=' + m.index + '), kaldiriliyor' });
+            description = appendCommonFooter(cleanIntro, title);
+            meta.description = description;
+            saveMeta();
+            send({ type: 'description', description });
+          }
         }
         send({ type: 'step-start', step: 'upload', message: 'Etsy\'ye yükleniyor...' });
         console.log(`  [upload] title="${(title||'').substring(0,50)}", tags=${tags.length}, desc=${(description||'').length} chars, mockups=${mockupOutputs.length}`);

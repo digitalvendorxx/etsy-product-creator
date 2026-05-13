@@ -3901,8 +3901,13 @@ https://www.etsy.com/listing/.../...
     <div style="display:grid;grid-template-columns:280px 1fr;gap:1rem;margin-top:1rem;min-height:500px">
       <!-- Template list -->
       <div style="border:1px solid var(--border);border-radius:var(--radius-sm);overflow-y:auto;max-height:calc(100vh - 200px)">
-        <div style="padding:0.5rem">
+        <div style="padding:0.5rem;display:flex;flex-direction:column;gap:0.4rem">
           <input type="text" id="calib-search" placeholder="Ara..." oninput="calibFilterList()" style="width:100%;padding:0.35rem 0.6rem;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-xs);color:var(--text);font-size:0.72rem">
+          <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.7rem;color:var(--text-dim);cursor:pointer;user-select:none">
+            <input type="checkbox" id="calib-only-used" checked onchange="calibFilterList()" style="margin:0;cursor:pointer">
+            <span>Sadece kullanilanlar</span>
+            <span id="calib-used-count" style="margin-left:auto;font-size:0.65rem;color:var(--text-dim)"></span>
+          </label>
         </div>
         <div id="calib-template-list" style="padding:0 0.25rem 0.5rem"></div>
       </div>
@@ -3987,6 +3992,14 @@ https://www.etsy.com/listing/.../...
             </div>
           </div>
           <button class="btn-ghost" style="padding:0.35rem 0.7rem;font-size:0.72rem;border-radius:var(--radius-xs)" onclick="calibSwapWH()" title="Yatay/Dikey degis">W/H</button>
+          <div style="display:flex;flex-direction:column;gap:2px;align-items:center">
+            <span style="font-size:0.6rem;color:var(--text-dim)">Aci (5&deg;)</span>
+            <div style="display:flex;gap:2px">
+              <button class="btn-ghost" style="padding:2px 8px;font-size:0.75rem;border-radius:var(--radius-xs)" onclick="calibRotate(-5)" title="5 derece sola">&#8634;</button>
+              <button class="btn-ghost" style="padding:2px 8px;font-size:0.75rem;border-radius:var(--radius-xs)" onclick="calibRotate(5)" title="5 derece saga">&#8635;</button>
+              <button class="btn-ghost" style="padding:2px 6px;font-size:0.65rem;border-radius:var(--radius-xs)" onclick="calibRotate(0,true)" title="Sifirla">0</button>
+            </div>
+          </div>
           <div style="border-left:1px solid var(--border);height:32px;margin:0 0.25rem"></div>
           <button class="btn-ghost" style="padding:0.35rem 0.7rem;font-size:0.72rem;border-radius:var(--radius-xs)" onclick="calibAutoSingle()">Otomatik</button>
           <button class="btn-ghost" style="padding:0.35rem 0.7rem;font-size:0.72rem;border-radius:var(--radius-xs)" onclick="calibLoadDesignOverlay()">Tasarim Yukle</button>
@@ -10666,17 +10679,33 @@ window.toggleTheme = function() {
 
   function calibRenderList() {
     const filter = (document.getElementById('calib-search')?.value || '').toLowerCase();
+    const onlyUsed = document.getElementById('calib-only-used')?.checked !== false;
     const container = document.getElementById('calib-template-list');
-    const filtered = calibState.templates.filter(t => t.name.toLowerCase().includes(filter));
+    let filtered = calibState.templates.filter(t => t.name.toLowerCase().includes(filter));
+    if (onlyUsed) filtered = filtered.filter(t => (t.usageCount || 0) > 0 || t.favorited);
+    filtered.sort((a, b) => (b.usageCount || 0) - (a.usageCount || 0) || a.name.localeCompare(b.name));
+    const usedCountEl = document.getElementById('calib-used-count');
+    if (usedCountEl) {
+      const totalUsed = calibState.templates.filter(t => (t.usageCount || 0) > 0 || t.favorited).length;
+      usedCountEl.textContent = `${totalUsed}/${calibState.templates.length}`;
+    }
+    if (filtered.length === 0) {
+      container.innerHTML = `<div style="padding:1rem;text-align:center;color:var(--text-dim);font-size:0.7rem">${onlyUsed ? 'Hic kullanilmis sablon yok' : 'Sablon bulunamadi'}</div>`;
+      return;
+    }
     container.innerHTML = filtered.map(t => {
       const badge = t.calibrated
         ? (t.source === 'manual' ? '<span style="color:var(--green);font-size:0.6rem;font-weight:600">[M]</span>'
            : '<span style="color:var(--amber);font-size:0.6rem;font-weight:600">[A]</span>')
         : '<span style="color:var(--text-dim);font-size:0.6rem">[?]</span>';
       const active = calibState.selected === t.name ? 'background:var(--accent-dim);border-color:var(--accent-border)' : '';
+      const fav = t.favorited ? '<span style="color:var(--amber);font-size:0.65rem" title="Favori">*</span>' : '';
+      const useTag = (t.usageCount || 0) > 0 ? `<span style="font-size:0.6rem;color:var(--text-dim)">x${t.usageCount}</span>` : '';
       return `<div onclick="calibSelectTemplate('${t.name.replace(/'/g, "\\'")}')" style="padding:0.35rem 0.5rem;cursor:pointer;border-radius:var(--radius-xs);border:1px solid transparent;margin-bottom:2px;font-size:0.72rem;display:flex;align-items:center;gap:0.4rem;${active}" class="calib-tpl-item">
         ${badge}
+        ${fav}
         <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1" title="${t.name}">${t.name}</span>
+        ${useTag}
       </div>`;
     }).join('');
   }
@@ -10856,6 +10885,21 @@ window.toggleTheme = function() {
     calibUpdateRect();
   }
   window.calibSwapWH = calibSwapWH;
+
+  // Rotate calibration rect by `deg` degrees. If reset=true, sets to 0.
+  function calibRotate(deg, reset) {
+    const rotEl = document.getElementById('calib-rot');
+    if (reset) {
+      rotEl.value = 0;
+    } else {
+      let cur = parseFloat(rotEl.value) || 0;
+      cur = ((cur + deg) % 360 + 360) % 360;
+      if (cur > 180) cur -= 360;
+      rotEl.value = cur;
+    }
+    calibUpdateRect();
+  }
+  window.calibRotate = calibRotate;
 
   // Load a design image into the rect as a live preview overlay.
   function calibLoadDesignOverlay() {

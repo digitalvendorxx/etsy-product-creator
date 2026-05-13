@@ -1,4 +1,5 @@
 const sharp = require('sharp');
+const { getType } = require('../lib/product-types');
 
 const MODEL = process.env.TAG_LAB_MODEL || 'google/gemini-2.0-flash-001';
 const MAX_DIM = 768;
@@ -44,20 +45,41 @@ async function callOpenRouter(model, body, apiKey) {
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-async function extractKeywords(imageBuffer, _mime, apiKey) {
+async function extractKeywords(imageBuffer, _mime, apiKey, opts = {}) {
   if (!apiKey) throw new Error('OPENROUTER_API_KEY not set');
+
+  // Backward compatible: when no productType is provided, the original t-shirt
+  // prompt is used verbatim. When set, swap to a product-aware variant so
+  // wall art / mug / candle keywords aren't forced into shirt phrasing.
+  const ptMeta = getType(opts.productType);
+  const productDetail = (opts.productDetail || '').trim();
+
+  let productSection;
+  let exclusionLine;
+  if (ptMeta) {
+    const synList = ptMeta.synonyms.join(', ');
+    const exampleList = ptMeta.themeExamples.join('", "');
+    const detailBlock = productDetail ? `\nSeller has provided this extra product detail (lean into it where natural): "${productDetail}".` : '';
+    productSection = `1) THEME phrases (most): every one MUST include a theme/character/style token AND a product type token. Use ONLY "${ptMeta.shortLabel}" or its synonyms (${synList}) as the product type — NEVER use shirt/tee/tshirt/sweatshirt/hoodie unless the user explicitly selected apparel. Vary sub-themes. e.g. "${exampleList}".${detailBlock}
+2) THEME + recipient/occasion: 1-2 phrases tying theme to buyer intent. e.g. "boho wall art gift", "${ptMeta.shortLabel} gift for her".
+3) PURE INTENT (1-2 only): "gift for her", "birthday gift him", "anniversary gift". NEVER pure product-only.`;
+    exclusionLine = `Do NOT include shirt/tee/tshirt/sweatshirt/hoodie tokens at all (the product is a ${ptMeta.shortLabel}, not apparel). Do NOT include pure intent words (gift, mom, etc) inside theme_words. Do NOT include unrelated occasions (halloween, christmas) unless the design clearly shows them.`;
+  } else {
+    productSection = `1) THEME phrases (most): every one MUST include a theme/character/franchise token. Use ONLY shirt/tee/tshirt/sweatshirt as product type (NEVER hoodie, crewneck, jumper, pullover, sweater). Vary sub-themes. e.g. "darth vader shirt", "star wars sweatshirt", "jedi tshirt", "stormtrooper tee".
+2) THEME + recipient/occasion: 1-2 phrases tying theme to buyer intent. e.g. "star wars gift him", "vader fan gift".
+3) PURE INTENT (1-2 only): "gift for her", "birthday gift him", "anniversary gift". NEVER pure product-only ("graphic tee", "cotton shirt").`;
+    exclusionLine = `Do NOT include shirt/tee/tshirt/sweatshirt or pure intent words (gift, mom, etc). Do NOT include unrelated occasions (halloween, christmas) unless the design clearly shows them.`;
+  }
 
   const prompt = `Analyze this Etsy product design image. Output two lists in JSON.
 
 "keywords" — 7-9 short Etsy buyer search phrases (1-4 words each), mixed:
-1) THEME phrases (most): every one MUST include a theme/character/franchise token. Use ONLY shirt/tee/tshirt/sweatshirt as product type (NEVER hoodie, crewneck, jumper, pullover, sweater). Vary sub-themes. e.g. "darth vader shirt", "star wars sweatshirt", "jedi tshirt", "stormtrooper tee".
-2) THEME + recipient/occasion: 1-2 phrases tying theme to buyer intent. e.g. "star wars gift him", "vader fan gift".
-3) PURE INTENT (1-2 only): "gift for her", "birthday gift him", "anniversary gift". NEVER pure product-only ("graphic tee", "cotton shirt").
+${productSection}
 
 "theme_words" — 25-40 single lowercase words covering EVERYTHING theme-related in the image AND common related synonyms an Etsy buyer might use. Include: main franchise/series tokens, character names, sub-themes, era/style descriptors, iconography, related concepts, aesthetic/style adjectives commonly paired with this theme, plant/animal/object names if part of the design, and morphological variants (singular and plural where natural).
 For Star Wars Darth Vader: ["star","wars","darth","vader","sith","jedi","lightsaber","empire","stormtrooper","yoda","luke","leia","han","skywalker","force","scifi","rebel","galactic","fantasy","movie","film","cinema","villain","saga","trilogy","geek","nerd","cosplay"].
 For a botanical/floral design: ["flower","flowers","floral","botanical","botanic","garden","plant","plants","houseplant","leaf","leaves","foliage","bloom","blossom","petal","wildflower","rose","daisy","sunflower","nature","cottage","cottagecore","boho","bohemian","earthy","greenhouse","gardener","greenery","vintage","pressed"].
-Do NOT include shirt/tee/tshirt/sweatshirt or pure intent words (gift, mom, etc). Do NOT include unrelated occasions (halloween, christmas) unless the design clearly shows them.
+${exclusionLine}
 
 Most important first. JSON only: {"keywords":["..."],"theme_words":["..."]}`;
 
