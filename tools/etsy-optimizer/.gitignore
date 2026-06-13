@@ -1,0 +1,13 @@
+node_modules/
+browser-profile/
+*.png
+*.jpg
+*.jpeg
+*.webp
+listings_*.json
+pin_progress*.json
+progress*.json
+sku_map.json
+screenshot*.png
+debug*.png
+test*.png

@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>Tag Lab</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      --bg: #fdf7ee; --bg-card: #fff; --bg-soft: #f5ecdc;
+      --ink: #2d2317; --ink-mid: #6a5a48; --ink-dim: #998772;
+      --line: #e8dcc6; --accent: #ff5a1f; --accent-deep: #e0480f;
+      --green: #2ea44f; --red: #cf2222; --amber: #d97706;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--ink); font-family: ui-rounded, -apple-system, system-ui, sans-serif; padding: 1.6rem 1.4rem 3rem; max-width: 1000px; margin: 0 auto; }
+    h1 { margin: 0 0 0.2rem; letter-spacing: -0.02em; }
+    .sub { color: var(--ink-mid); margin: 0 0 1.5rem; font-size: 0.92rem; }
+    .card { background: var(--bg-card); border: 1px solid var(--line); border-radius: 14px; padding: 1.05rem 1.15rem; margin-bottom: 0.85rem; }
+    .card.hl { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(255,90,31,0.08); }
+    label.f { display: block; font-size: 0.82rem; color: var(--ink-mid); margin-bottom: 0.4rem; font-weight: 600; }
+    input[type=file], input[type=number], input[type=text] {
+      width: 100%; background: var(--bg-soft); border: 1.5px solid transparent;
+      border-radius: 10px; padding: 0.6rem 0.85rem; font-family: inherit; outline: 0;
+    }
+    .row { display: flex; gap: 0.7rem; align-items: flex-end; flex-wrap: wrap; }
+    .row > * { flex: 1 1 140px; }
+    .btn { background: var(--accent); color: #fff; border: 0; padding: 0.7rem 1.2rem; border-radius: 12px; font-family: inherit; font-weight: 600; cursor: pointer; min-height: 44px; }
+    .btn:hover { background: var(--accent-deep); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn.ghost { background: var(--bg-card); color: var(--ink); border: 1px solid var(--line); }
+    .preview { max-width: 200px; max-height: 200px; border-radius: 10px; border: 1px solid var(--line); display: block; margin-top: 0.6rem; }
+    .kw-list { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+    .kw {
+      background: var(--bg-soft); padding: 0.35rem 0.8rem; border-radius: 999px;
+      font-size: 0.85rem; border: 1px solid var(--line); cursor: pointer;
+    }
+    .kw:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+    .best-grid { display: grid; grid-template-columns: 1fr auto auto auto auto; gap: 0.4rem 0.85rem; align-items: center; font-size: 0.88rem; }
+    .best-grid .h { font-weight: 600; color: var(--ink-mid); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; padding-bottom: 0.3rem; border-bottom: 1px solid var(--line); }
+    .best-grid .kw-cell { font-weight: 500; }
+    .best-grid .num { font-variant-numeric: tabular-nums; color: var(--ink-mid); text-align: right; }
+    .best-grid .copy-cell { text-align: right; }
+    .best-copy {
+      background: var(--bg-soft); border: 1px solid var(--line);
+      padding: 0.5rem 0.7rem; border-radius: 8px; font-family: ui-monospace, Menlo, monospace;
+      font-size: 0.82rem; white-space: pre-wrap; word-break: break-word; cursor: pointer;
+      margin-top: 0.6rem;
+    }
+    .best-copy:hover { background: var(--bg-card); }
+
+    details.kw-detail { margin-top: 0.6rem; border-top: 1px dashed var(--line); padding-top: 0.6rem; }
+    details.kw-detail summary { cursor: pointer; font-size: 0.88rem; color: var(--ink); padding: 0.2rem 0; }
+    details.kw-detail summary:hover { color: var(--accent); }
+    .top5 { display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.4rem; }
+    .top5-item { display: flex; justify-content: space-between; gap: 0.6rem; padding: 0.3rem 0.6rem; background: var(--bg-soft); border-radius: 8px; font-size: 0.82rem; }
+    .top5-item .s { color: var(--ink-mid); font-variant-numeric: tabular-nums; }
+
+    pre.log {
+      background: var(--bg-soft); border: 1px solid var(--line); border-radius: 10px;
+      padding: 0.7rem; max-height: 200px; overflow: auto; font-size: 0.78rem;
+      white-space: pre-wrap; color: var(--ink-mid); font-family: ui-monospace, Menlo, monospace;
+    }
+    .err { color: var(--red); font-size: 0.85rem; }
+    .empty { color: var(--ink-dim); font-size: 0.88rem; padding: 0.5rem 0; }
+    .pill {
+      display: inline-block; padding: 0.15rem 0.5rem; border-radius: 999px;
+      background: var(--bg-soft); font-size: 0.72rem; color: var(--ink-mid);
+      border: 1px solid var(--line); margin-left: 0.3rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Tag Lab</h1>
+  <p class="sub">Gorseli yukle → Gemini betimleyici keyword'leri cikarir → EtsyHunt'tan tablolari toplar → Puan'a gore en iyi 13'u secer.</p>
+
+  <div class="card">
+    <label class="f">Tasarim gorseli</label>
+    <input type="file" id="img" accept="image/*">
+    <img class="preview" id="pv" style="display:none;">
+
+    <div style="margin-top:0.9rem; display:flex; justify-content:flex-end; gap:0.5rem;">
+      <button class="btn ghost" id="btnExtract" onclick="onlyExtract()">Sadece keyword</button>
+      <button class="btn" id="btnRun" onclick="runFull()">Calistir</button>
+    </div>
+  </div>
+
+  <div class="card" id="kwCard" style="display:none;">
+    <label class="f">Cikartilan keyword'ler <span class="pill" id="kwPass"></span></label>
+    <div class="kw-list" id="kwList"></div>
+  </div>
+
+  <div class="card hl" id="bestCard" style="display:none;">
+    <label class="f">En iyi <span id="bestN">0</span> tag (Puan'a gore)</label>
+    <div class="best-grid" id="bestGrid"></div>
+    <div class="best-copy" id="bestCopy" onclick="copyBest()" title="Tikla = panoya kopyala"></div>
+  </div>
+
+  <div class="card hl" id="listingCard" style="display:none;">
+    <label class="f">Listing icerigi</label>
+    <div style="margin-top:0.4rem;">
+      <div style="font-size:0.78rem; color:var(--ink-mid); text-transform:uppercase; letter-spacing:0.05em; font-weight:600;">Baslik</div>
+      <div id="listingTitle" style="margin-top:0.3rem; line-height:1.4; cursor:pointer; padding:0.5rem 0.7rem; background:var(--bg-soft); border:1px solid var(--line); border-radius:8px;" onclick="copyText(this.textContent, this)"></div>
+    </div>
+    <div style="margin-top:0.8rem;">
+      <div style="font-size:0.78rem; color:var(--ink-mid); text-transform:uppercase; letter-spacing:0.05em; font-weight:600;">Aciklama</div>
+      <pre id="listingDesc" style="margin-top:0.3rem; white-space:pre-wrap; font-family:inherit; font-size:0.9rem; line-height:1.5; padding:0.6rem 0.7rem; background:var(--bg-soft); border:1px solid var(--line); border-radius:8px; cursor:pointer; max-height:300px; overflow:auto;" onclick="copyText(this.textContent, this)"></pre>
+    </div>
+  </div>
+
+  <div class="card" id="detailsCard" style="display:none;">
+    <label class="f">Keyword detaylari</label>
+    <div id="details"></div>
+  </div>
+
+  <div class="card" id="manualCard">
+    <label class="f">Manuel keyword arat</label>
+    <div class="row">
+      <input type="text" id="manualKw" placeholder="orn: floral shirt">
+      <button class="btn" onclick="manualSearch()" style="flex:0 0 auto;">EtsyHunt'ta arat</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <label class="f">Log</label>
+    <pre class="log" id="log"></pre>
+  </div>
+
+<script>
+const $ = id => document.getElementById(id);
+function log(s) { const el = $('log'); el.textContent += (el.textContent ? '\n' : '') + s; el.scrollTop = el.scrollHeight; }
+function fmtNum(n) { if (!n && n !== 0) return ''; if (n >= 1e6) return (n/1e6).toFixed(1) + 'M'; if (n >= 1e3) return (n/1e3).toFixed(1) + 'K'; return String(Math.round(n)); }
+
+let bestRows = [];
+let detailsByKw = {};
+
+$('img').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  const url = URL.createObjectURL(f);
+  $('pv').src = url; $('pv').style.display = 'block';
+});
+
+function renderKeywords(list, isRetry) {
+  $('kwCard').style.display = list.length ? '' : 'none';
+  $('kwPass').textContent = isRetry ? 'retry' : '';
+  $('kwList').innerHTML = list.map(k =>
+    '<span class="kw" onclick="manualSearchKw(' + JSON.stringify(k).replace(/"/g, '&quot;') + ')">' + k + ' →</span>'
+  ).join('');
+}
+
+function renderBest(rows) {
+  bestRows = rows;
+  $('bestCard').style.display = rows.length ? '' : 'none';
+  $('bestN').textContent = rows.length;
+  const grid = $('bestGrid');
+  grid.innerHTML = '<div class="h">Keyword</div><div class="h num">Skor</div><div class="h num">Comp</div><div class="h num">Aylik View</div><div class="h num">Aylik Satis</div>'
+    + rows.map(r =>
+      '<div class="kw-cell">' + (r.keyword || '') + '</div>'
+      + '<div class="num">' + (r.compositeScore != null ? Math.round(r.compositeScore) : '-') + '</div>'
+      + '<div class="num">' + fmtNum(r.competition) + '</div>'
+      + '<div class="num">' + fmtNum(r.viewsMonthly) + '</div>'
+      + '<div class="num">' + fmtNum(r.monthlySales) + '</div>'
+    ).join('');
+  $('bestCopy').textContent = rows.map(r => r.keyword).join(', ');
+}
+
+function appendDetail(keyword, top, count, err) {
+  $('detailsCard').style.display = '';
+  detailsByKw[keyword] = { top: top || [], count: count || 0, err };
+  const wrap = $('details');
+  let block = document.getElementById('det-' + btoa(keyword).replace(/=/g,''));
+  if (!block) {
+    block = document.createElement('details');
+    block.className = 'kw-detail';
+    block.id = 'det-' + btoa(keyword).replace(/=/g,'');
+    wrap.appendChild(block);
+  }
+  const items = (top || []).map(r =>
+    '<div class="top5-item"><span>' + r.keyword + '</span><span class="s">P:' + (r.score ? r.score.toFixed(1) : '-') + ' · V:' + fmtNum(r.viewsMonthly) + '</span></div>'
+  ).join('');
+  block.innerHTML = '<summary>' + keyword + ' <span class="pill">' + (count || 0) + ' row</span>' + (err ? ' <span class="err">' + err + '</span>' : '') + '</summary>'
+    + '<div class="top5">' + (items || '<div class="empty">Sonuc yok.</div>') + '</div>';
+}
+
+function clearAll() {
+  $('details').innerHTML = '';
+  detailsByKw = {};
+  bestRows = [];
+  $('bestCard').style.display = 'none';
+  $('detailsCard').style.display = 'none';
+  $('listingCard').style.display = 'none';
+  $('listingTitle').textContent = '';
+  $('listingDesc').textContent = '';
+  $('log').textContent = '';
+}
+async function copyText(text, el) {
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    const orig = el.style.background;
+    el.style.background = 'var(--accent)';
+    el.style.color = '#fff';
+    setTimeout(() => { el.style.background = orig; el.style.color = ''; }, 600);
+  } catch {}
+}
+
+async function copyBest() {
+  if (!bestRows.length) return;
+  try {
+    await navigator.clipboard.writeText(bestRows.map(r => r.keyword).join(', '));
+    const c = $('bestCopy'); const orig = c.textContent;
+    c.textContent = 'Kopyalandi!'; setTimeout(() => c.textContent = orig, 1200);
+  } catch {}
+}
+
+async function onlyExtract() {
+  const f = $('img').files[0]; if (!f) return alert('Once gorsel sec');
+  $('btnExtract').disabled = true; clearAll(); log('Keyword cikartiliyor...');
+  try {
+    const fd = new FormData(); fd.append('design', f);
+    const r = await fetch('/api/extract', { method: 'POST', body: fd });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    const kws = d.keywords || [];
+    renderKeywords(kws, false);
+    log('Bulunan: ' + kws.join(' | '));
+    if (kws.length) {
+      log('EtsyHunt aramalari basliyor...');
+      for (const kw of kws) {
+        await manualSearchKw(kw);
+      }
+      log('Tum aramalar tamamlandi.');
+    }
+  } catch (e) { log('HATA: ' + e.message); }
+  finally { $('btnExtract').disabled = false; }
+}
+
+async function manualSearch() {
+  const kw = $('manualKw').value.trim();
+  if (!kw) return;
+  await manualSearchKw(kw);
+}
+async function manualSearchKw(kw) {
+  log('Manuel: "' + kw + '"');
+  try {
+    const r = await fetch('/api/etsyhunt', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keyword: kw, limit: 50 }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'HTTP ' + r.status);
+    appendDetail(kw, (d.rows || []).slice(0, 10), (d.rows || []).length);
+    log('  → ' + (d.rows || []).length + ' row');
+  } catch (e) { appendDetail(kw, [], 0, e.message); log('HATA: ' + e.message); }
+}
+
+async function runFull() {
+  const f = $('img').files[0]; if (!f) return alert('Once gorsel sec');
+  $('btnRun').disabled = true; clearAll();
+  try {
+    const fd = new FormData();
+    fd.append('design', f);
+    const r = await fetch('/api/run', { method: 'POST', body: fd });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const reader = r.body.getReader(); const dec = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { done, value } = await reader.read(); if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const events = buf.split('\n\n'); buf = events.pop() || '';
+      for (const ev of events) {
+        const lines = ev.split('\n');
+        const eline = lines.find(l => l.startsWith('event:'));
+        const dline = lines.find(l => l.startsWith('data:'));
+        if (!eline || !dline) continue;
+        const event = eline.slice(6).trim();
+        let data = {}; try { data = JSON.parse(dline.slice(5).trim()); } catch {}
+        if (event === 'log') log(data.message);
+        else if (event === 'keywords') renderKeywords(data.keywords || [], !!data.retry);
+        else if (event === 'result') appendDetail(data.keyword, data.top || [], data.count || 0, data.error);
+        else if (event === 'best-progress') log('  Aday: ' + data.count + ' / ortalama puan ' + (data.avgScore || 0).toFixed(1));
+        else if (event === 'best') renderBest(data.rows || []);
+        else if (event === 'listing') {
+          $('listingTitle').textContent = data.title || '';
+          $('listingDesc').textContent = data.description || '';
+          $('listingCard').style.display = (data.title || data.description) ? '' : 'none';
+          log('Title + description hazir');
+        }
+        else if (event === 'error') log('HATA: ' + data.message);
+      }
+    }
+  } catch (e) { log('HATA: ' + e.message); }
+  finally { $('btnRun').disabled = false; }
+}
+</script>
+</body>
+</html>

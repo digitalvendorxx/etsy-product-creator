@@ -1,0 +1,17 @@
+{
+  "name": "etsy-optimizer",
+  "version": "1.0.0",
+  "scripts": {
+    "scrape": "node scrape.js",
+    "edit": "node edit.js",
+    "pinterest:auth": "node pinterest_auth.js",
+    "pinterest:board": "node pinterest_board.js",
+    "pinterest:scrape": "node pinterest_scrape.js",
+    "pinterest:post": "node pinterest_post.js",
+    "pinterest:dry-run": "node pinterest_post.js --dry-run"
+  },
+  "dependencies": {
+    "dotenv": "^17.3.1",
+    "playwright": "^1.58.2"
+  }
+}
