@@ -153,6 +153,7 @@
   .side-overlay { display: none; }
   .side-toggle { display: none; }
   @media (max-width: 800px) {
+    html, body { overflow-x: hidden; }
     .side {
       position: fixed; top: 0; left: 0;
       transform: translateX(-100%);
@@ -177,6 +178,7 @@
       cursor: pointer; z-index: 26; padding: 0;
       box-shadow: var(--shadow-md);
     }
+    body[data-view="api"] .side-toggle { left: auto; right: 0.85rem; }
     .actionbar { left: 0 !important; }
     .page { padding: 3rem 1rem 4rem; }
   }
@@ -370,6 +372,78 @@
   .api-check.ok .mark { background: rgba(16,185,129,0.15); color: var(--green); }
   .api-pill-list { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }
   .api-pill-list a, .api-pill-list span { border: 1px solid var(--line); border-radius: 999px; padding: 0.35rem 0.65rem; color: var(--ink-mid); text-decoration: none; font-size: 0.76rem; background: var(--bg-card); }
+  .api-site {
+    margin-top: 0.9rem;
+    border: 1px solid var(--line);
+    background: var(--bg-card);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+  }
+  .api-site-head {
+    display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem;
+    padding: 0.95rem 1rem;
+    border-bottom: 1px solid var(--line);
+    background: var(--bg-soft);
+  }
+  .api-site-title { font-size: 1.05rem; font-weight: 780; }
+  .api-site-sub { color: var(--ink-mid); font-size: 0.82rem; margin-top: 0.18rem; }
+  .api-tabs {
+    display: flex; gap: 0.35rem; overflow-x: auto;
+    padding: 0.65rem 0.75rem 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .api-tab {
+    flex: 0 0 auto;
+    border: 1px solid var(--line);
+    background: var(--bg-card);
+    color: var(--ink-mid);
+    border-radius: 8px 8px 0 0;
+    padding: 0.48rem 0.7rem;
+    font-family: inherit;
+    font-size: 0.78rem;
+    font-weight: 720;
+    cursor: pointer;
+  }
+  .api-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .api-tab-panel { padding: 1rem; display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(260px, 0.55fr); gap: 1rem; }
+  .api-tab-kicker { color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 800; font-size: 0.68rem; }
+  .api-tab-title { margin-top: 0.25rem; font-size: 1.35rem; line-height: 1.12; font-weight: 780; }
+  .api-tab-body { margin-top: 0.45rem; color: var(--ink-mid); font-size: 0.88rem; line-height: 1.55; }
+  .api-tab-list { display: grid; gap: 0.45rem; }
+  .api-tab-list .item { border: 1px solid var(--line); border-radius: 8px; padding: 0.6rem 0.7rem; color: var(--ink-mid); font-size: 0.8rem; line-height: 1.42; background: var(--bg-soft); }
+  .api-bottom-note {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.65rem;
+    padding: 0 1rem 1rem;
+  }
+  .api-bottom-note .note {
+    border: 1px solid var(--line); border-radius: 8px; padding: 0.75rem;
+    background: var(--bg-card);
+  }
+  .api-bottom-note strong { display: block; font-size: 0.82rem; }
+  .api-bottom-note span { display: block; margin-top: 0.28rem; color: var(--ink-mid); font-size: 0.75rem; line-height: 1.4; }
+  .tool-lock-banner {
+    display: grid; grid-template-columns: 1fr auto; gap: 0.85rem; align-items: center;
+    margin-top: 0.95rem; padding: 0.85rem; border-radius: 8px;
+    border: 1px solid rgba(220,38,38,0.22); background: rgba(220,38,38,0.06);
+  }
+  .tool-lock-banner.ready { border-color: rgba(46,164,79,0.28); background: rgba(46,164,79,0.08); }
+  .tool-lock-title { font-weight: 750; font-size: 0.92rem; }
+  .tool-lock-meta { margin-top: 0.2rem; color: var(--ink-mid); font-size: 0.78rem; line-height: 1.45; }
+  .service-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0.65rem; margin-top: 0.8rem; }
+  .service-card {
+    border: 1px solid var(--line); background: var(--bg-card); border-radius: 8px;
+    padding: 0.75rem; min-height: 118px;
+  }
+  .service-card strong { display: block; font-size: 0.88rem; line-height: 1.25; }
+  .service-card span { display: block; margin-top: 0.35rem; color: var(--ink-mid); font-size: 0.76rem; line-height: 1.4; }
+  body.tool-locked [data-requires-etsy] { opacity: 0.52; }
+  body.tool-locked button[data-requires-etsy] { cursor: not-allowed; }
+  @media (max-width: 900px) { .api-tab-panel { grid-template-columns: 1fr; } .api-site-head { align-items: flex-start; flex-direction: column; } }
+  @media (max-width: 800px) {
+    .api-tabs { flex-wrap: wrap; overflow-x: visible; padding-bottom: 0.65rem; }
+    .api-tab { border-radius: 8px; }
+  }
   @media (max-width: 980px) { .api-grid { grid-template-columns: 1fr; } }
   @media (max-width: 980px) { .supply-layout { grid-template-columns: 1fr; } }
 
@@ -979,9 +1053,9 @@
   <div class="hub-page">
     <div class="hub-hero">
       <section class="hub-panel">
-        <div class="card-title">Tek merkez</div>
-        <h1 class="hub-title">Etsy tool merkezi</h1>
-        <p class="hub-sub">Tshirt, baby puzzle, cocuk parki, canvas, cam tablo, optimizer ve Etsy API operasyonlari ayni ekrandan yonetilir. Uretilen baslik, tag ve aciklamalar 13 Haziran 2026 Etsy algoritma kuralina gore kontrol edilir.</p>
+        <div class="card-title">EtsyOkulu Tools / Ayri tool sekmesi</div>
+        <h1 class="hub-title">Etsy Product Creator</h1>
+        <p class="hub-sub">EtsyOkulu tool sayfasindan acilan ayri bir uretim araci gibi calisir. Etsy API baglantisi tamamlanmadan Product Creator aksiyonlari kilitlidir; baglantidan sonra draft-first listing, mockup, tedarik dosyasi, fiyat ve fulfillment akisi acilir.</p>
         <div class="hub-rule-row">
           <span class="hub-rule">Kisa title</span>
           <span class="hub-rule">13 varied tag</span>
@@ -990,10 +1064,17 @@
           <span class="hub-rule">Commercial access hazirligi</span>
         </div>
         <div class="hub-actions">
-          <button class="btn btn-primary" onclick="hubStart('single')" style="min-height:40px; padding:0 1rem; font-size:0.86rem;">Tshirt baslat</button>
-          <button class="btn btn-ghost" onclick="hubStart('front-back')" style="min-height:40px; padding:0 1rem; font-size:0.86rem;">Tshirt on/arka</button>
-          <button class="btn btn-ghost" onclick="hubStartProduct('baby puzzle','personalized wooden baby name puzzle')" style="min-height:40px; padding:0 1rem; font-size:0.86rem;">Baby puzzle</button>
-          <button class="btn btn-ghost" onclick="hubStartProduct('children playground','outdoor kids playground equipment and backyard playset')" style="min-height:40px; padding:0 1rem; font-size:0.86rem;">Cocuk parki</button>
+          <button class="btn btn-primary" data-requires-etsy onclick="hubStart('single')" style="min-height:40px; padding:0 1rem; font-size:0.86rem;">Tshirt baslat</button>
+          <button class="btn btn-ghost" data-requires-etsy onclick="hubStart('front-back')" style="min-height:40px; padding:0 1rem; font-size:0.86rem;">Tshirt on/arka</button>
+          <button class="btn btn-ghost" data-requires-etsy onclick="hubStartProduct('baby puzzle','personalized wooden baby name puzzle')" style="min-height:40px; padding:0 1rem; font-size:0.86rem;">Baby puzzle</button>
+          <button class="btn btn-ghost" data-requires-etsy onclick="hubStartProduct('children playground','outdoor kids playground equipment and backyard playset')" style="min-height:40px; padding:0 1rem; font-size:0.86rem;">Cocuk parki</button>
+        </div>
+        <div class="tool-lock-banner" id="toolLockBanner">
+          <div>
+            <div class="tool-lock-title">API kilidi kontrol ediliyor</div>
+            <div class="tool-lock-meta">Etsy API key, OAuth redirect, OAuth token ve Shop ID hazir olmadan uretim calismaz.</div>
+          </div>
+          <button class="pill-btn" onclick="goView('api')">API paneli</button>
         </div>
       </section>
 
@@ -1046,14 +1127,14 @@
               <div class="page-title">Urun uretim akislari</div>
               <div class="page-sub">Eski tshirt teknik aciklama sablonu durur; ek olarak baby puzzle ve cocuk urunleri ayni algoritma kuralina baglanir.</div>
             </div>
-            <button class="pill-btn" onclick="goView('wizard')">Wizard'i ac</button>
+            <button class="pill-btn" data-requires-etsy onclick="goView('wizard')">Wizard'i ac</button>
           </div>
           <div class="hub-product-grid">
-            <div class="hub-product" onclick="hubStart('single')"><strong>Tshirt</strong><span>Tek tasarim apparel mockup. Teknik description bolumleri korunur.</span><button class="ops-run" onclick="event.stopPropagation(); hubStart('single')">Baslat</button></div>
-            <div class="hub-product" onclick="hubStart('front-back')"><strong>Tshirt on / arka</strong><span>Front-back kalibrasyon ve eski apparel akisi aynen devam eder.</span><button class="ops-run" onclick="event.stopPropagation(); hubStart('front-back')">Baslat</button></div>
-            <div class="hub-product" onclick="hubStartProduct('baby puzzle','personalized wooden baby name puzzle')"><strong>Baby puzzle</strong><span>Nursery/lifestyle sahne, baby name puzzle title/tag/description.</span><button class="ops-run" onclick="event.stopPropagation(); hubStartProduct('baby puzzle','personalized wooden baby name puzzle')">Baslat</button></div>
-            <div class="hub-product" onclick="hubStartProduct('children playground','outdoor kids playground equipment and backyard playset')"><strong>Cocuk parki</strong><span>Outdoor playset, swing, slide ve kids park urunleri icin genel urun modu.</span><button class="ops-run" onclick="event.stopPropagation(); hubStartProduct('children playground','outdoor kids playground equipment and backyard playset')">Baslat</button></div>
-            <div class="hub-product" onclick="hubStart('bulk')"><strong>Toplu tshirt</strong><span>Coklu tasarimlari ayni operasyonla hazirlar.</span><button class="ops-run" onclick="event.stopPropagation(); hubStart('bulk')">Baslat</button></div>
+            <div class="hub-product" data-requires-etsy onclick="hubStart('single')"><strong>Tshirt</strong><span>Tek tasarim apparel mockup. Teknik description bolumleri korunur.</span><button class="ops-run" data-requires-etsy onclick="event.stopPropagation(); hubStart('single')">Baslat</button></div>
+            <div class="hub-product" data-requires-etsy onclick="hubStart('front-back')"><strong>Tshirt on / arka</strong><span>Front-back kalibrasyon ve eski apparel akisi aynen devam eder.</span><button class="ops-run" data-requires-etsy onclick="event.stopPropagation(); hubStart('front-back')">Baslat</button></div>
+            <div class="hub-product" data-requires-etsy onclick="hubStartProduct('baby puzzle','personalized wooden baby name puzzle')"><strong>Baby puzzle</strong><span>Nursery/lifestyle sahne, baby name puzzle title/tag/description.</span><button class="ops-run" data-requires-etsy onclick="event.stopPropagation(); hubStartProduct('baby puzzle','personalized wooden baby name puzzle')">Baslat</button></div>
+            <div class="hub-product" data-requires-etsy onclick="hubStartProduct('children playground','outdoor kids playground equipment and backyard playset')"><strong>Cocuk parki</strong><span>Outdoor playset, swing, slide ve kids park urunleri icin genel urun modu.</span><button class="ops-run" data-requires-etsy onclick="event.stopPropagation(); hubStartProduct('children playground','outdoor kids playground equipment and backyard playset')">Baslat</button></div>
+            <div class="hub-product" data-requires-etsy onclick="hubStart('bulk')"><strong>Toplu tshirt</strong><span>Coklu tasarimlari ayni operasyonla hazirlar.</span><button class="ops-run" data-requires-etsy onclick="event.stopPropagation(); hubStart('bulk')">Baslat</button></div>
           </div>
         </div>
 
@@ -1629,18 +1710,33 @@
       </div>
 
       <div class="card">
-        <div class="card-title">Legal ve Etsy trademark sayfalari</div>
-        <div class="card-sub">Commercial access incelemesi icin public URL'lerde bulunmasi gereken sayfalar.</div>
+        <div class="card-title">Commercial review sayfalari</div>
+        <div class="card-sub">Tool detayi, trademark disclaimer, terms, privacy, deletion, security, support ve IP sayfalari.</div>
         <div class="api-pill-list" id="apiLegalLinks"></div>
         <div class="field-hint" id="apiDisclaimer" style="margin-top:0.8rem;"></div>
       </div>
 
       <div class="card">
-        <div class="card-title">Gerekli scope'lar</div>
-        <div class="card-sub">Operasyonlar icin OAuth izinleri.</div>
+        <div class="card-title">Tool detayi ve scope'lar</div>
+        <div class="card-sub" id="apiToolDetail">Commercial application ozet bilgisi burada gorunur.</div>
         <div class="api-pill-list" id="apiScopes"></div>
       </div>
     </div>
+
+    <section class="api-site" id="apiComplianceSite">
+      <div class="api-site-head">
+        <div>
+          <div class="api-site-title">Commercial application site detail</div>
+          <div class="api-site-sub">Etsy API review icin tool detayi, API kullanimi, data, security ve trademark metinleri alt sekmelerde.</div>
+        </div>
+        <a class="pill-btn" href="/commercial-application" target="_blank" style="text-decoration:none;">Public detail page</a>
+      </div>
+      <div class="api-tabs" id="apiComplianceTabs"></div>
+      <div class="api-tab-panel" id="apiCompliancePanel">
+        <div style="color:var(--ink-dim);">Commercial sekmeleri yukleniyor...</div>
+      </div>
+      <div class="api-bottom-note" id="apiComplianceBottom"></div>
+    </section>
 
     <div class="card" style="margin-top:0.9rem;">
       <div class="page-head" style="margin-bottom:0.55rem;">
@@ -1671,7 +1767,13 @@
       <div class="card"><div class="card-title">Katalog</div><div class="card-num" id="supplyStatProducts">-</div><div class="card-sub">urun tipi</div></div>
       <div class="card"><div class="card-title">Kargo</div><div class="card-num" id="supplyStatCountries">220+</div><div class="card-sub">ulke hedefi</div></div>
       <div class="card"><div class="card-title">Model</div><div class="card-num">POD</div><div class="card-sub">satildikca uretim</div></div>
-      <div class="card"><div class="card-title">Kanallar</div><div class="card-num">2</div><div class="card-sub">Etsy / Amazon hazirligi</div></div>
+      <div class="card"><div class="card-title">Kanallar</div><div class="card-num" id="supplyStatChannels">-</div><div class="card-sub">Etsy-first kanal hazirligi</div></div>
+    </div>
+
+    <div class="card" style="margin-top:0.9rem;">
+      <div class="card-title">Rexven benzeri hizmet modulleri</div>
+      <div class="card-sub">Katalog, mockup, listing, tedarik dosyasi, fulfillment, kar, kanal ve compliance akisi tek tool icinde.</div>
+      <div class="service-grid" id="supplyServices"></div>
     </div>
 
     <div class="supply-layout">
@@ -1942,6 +2044,13 @@ const state = {
   producedListingUrl: '',
 };
 
+const toolGate = {
+  ready: false,
+  loaded: false,
+  missing: [],
+  readiness: null,
+};
+
 const MODE_LABELS = {
   'single': 'Tshirt / tek tasarim',
   'front-back': 'Tshirt on / arka',
@@ -1949,7 +2058,8 @@ const MODE_LABELS = {
   'bulk': 'Toplu (Coklu)',
 };
 
-function pickMode(m) {
+async function pickMode(m) {
+  if (!(await ensureToolReady())) return;
   state.mode = m;
   if (m === 'single' || m === 'front-back' || m === 'bulk') {
     state.productType = 'tshirt';
@@ -1962,7 +2072,8 @@ function pickMode(m) {
   setTimeout(nextStep, 250);
 }
 
-function pickProductPreset(preset) {
+async function pickProductPreset(preset) {
+  if (!(await ensureToolReady())) return;
   state.mode = 'product-mockup';
   if (preset === 'baby-puzzle') {
     state.productType = 'baby puzzle';
@@ -1993,6 +2104,46 @@ function toggleTheme() {
 function toast(msg) {
   const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show');
   clearTimeout(window._tt); window._tt = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function isToolReady() {
+  return !!toolGate.ready;
+}
+
+function applyToolGate(readiness) {
+  if (!readiness) return;
+  toolGate.ready = !!readiness.ready;
+  toolGate.loaded = true;
+  toolGate.readiness = readiness;
+  toolGate.missing = readiness.missing || (readiness.checks || []).filter(c => !c.ok);
+  document.body.classList.toggle('tool-locked', !toolGate.ready);
+  document.querySelectorAll('button[data-requires-etsy]').forEach(btn => {
+    btn.disabled = !toolGate.ready;
+    btn.title = toolGate.ready ? '' : 'Etsy API baglanmadan Product Creator calismaz';
+  });
+  const banner = document.getElementById('toolLockBanner');
+  if (banner) {
+    banner.classList.toggle('ready', toolGate.ready);
+    const missing = toolGate.missing.map(c => c.label).slice(0, 3).join(' | ');
+    banner.innerHTML = toolGate.ready
+      ? `<div><div class="tool-lock-title">API bagli, Product Creator aktif</div><div class="tool-lock-meta">${supplyEsc(readiness.disclaimer || '')}</div></div><button class="pill-btn" onclick="goView('api')">API paneli</button>`
+      : `<div><div class="tool-lock-title">Product Creator kilitli</div><div class="tool-lock-meta">${supplyEsc(missing || 'Etsy API key, OAuth redirect, OAuth token ve Shop ID gerekli.')}</div></div><button class="pill-btn" onclick="goView('api')">API bagla</button>`;
+  }
+}
+
+async function ensureToolReady() {
+  if (toolGate.ready) return true;
+  if (!toolGate.loaded) {
+    try {
+      const r = await fetch('/api/etsy/commercial-readiness');
+      const d = await r.json();
+      applyToolGate(d);
+    } catch {}
+  }
+  if (toolGate.ready) return true;
+  toast('Etsy API baglanmadan Product Creator calismaz');
+  if (viewState.current !== 'api') goView('api');
+  return false;
 }
 
 // ── Step navigation ──
@@ -2326,7 +2477,8 @@ function renderBulkRows() {
     </div>`;
   }).join('');
 }
-function nextStep() {
+async function nextStep() {
+  if (!(await ensureToolReady())) return;
   if (state.step === 1) {
     if (!state.mode) return toast('Once bir arac sec');
   }
@@ -2803,7 +2955,12 @@ async function saveSettings() {
         etsyShopName,
       }),
     });
-    toast('Kaydedildi'); closeModal(); refreshStatus();
+    toast('Kaydedildi');
+    closeModal();
+    refreshStatus();
+    apiState.loaded = false;
+    hubRefreshApi(false);
+    if (viewState.current === 'api') loadApiPanel(true);
   } catch { toast('Kaydedilemedi'); }
 }
 
@@ -2942,6 +3099,7 @@ function _runOne(fd) {
 }
 
 async function startCreate() {
+  if (!(await ensureToolReady())) return;
   if (state.source !== 'ai' && !state.status.cdpRunning) {
     return toast('Tarayici bagli olmali (sag ust)');
   }
@@ -3151,14 +3309,16 @@ function hubSetTool(tool) {
   if (tool === 'optimizer') hubLoadOptimizer();
 }
 
-function hubStart(mode) {
-  goView('wizard');
+async function hubStart(mode) {
+  if (!(await ensureToolReady())) return;
+  await goView('wizard');
   showStep(1);
   setTimeout(() => pickMode(mode), 40);
 }
 
-function hubStartProduct(productType, productContext) {
-  goView('wizard');
+async function hubStartProduct(productType, productContext) {
+  if (!(await ensureToolReady())) return;
+  await goView('wizard');
   state.mode = 'product-mockup';
   state.productType = productType;
   state.productContext = productContext;
@@ -3183,6 +3343,7 @@ async function hubRefreshApi(showLog = false) {
     const d = await r.json();
     apiState.readiness = d;
     apiState.loaded = true;
+    applyToolGate(d);
     const ready = !!d.ready;
     if (statusEl) statusEl.textContent = ready ? 'Hazir' : 'Eksik';
     if (checksEl) {
@@ -3275,7 +3436,8 @@ async function hubLoadOptimizer() {
   }
 }
 
-function goView(name) {
+async function goView(name) {
+  if (['wizard', 'puzzle', 'supply'].includes(name) && !(await ensureToolReady())) return;
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   const el = document.getElementById('v-' + name);
   if (!el) { toast('Bilinmeyen ekran: ' + name); return; }
@@ -3285,6 +3447,7 @@ function goView(name) {
   if (navBtn) navBtn.classList.add('active');
   document.getElementById('wizardActionbar').style.display = (name === 'wizard') ? '' : 'none';
   viewState.current = name;
+  document.body.dataset.view = name;
   toggleSide(false);
   if (name === 'hub') hubInit(true);
   else if (name === 'stats') loadStats();
@@ -4220,11 +4383,55 @@ function closeOpsConsole() {
 }
 
 const apiState = { loaded: false, readiness: null, operations: null };
+const apiComplianceState = { active: 'tool-detail' };
+
+function setApiComplianceTab(id) {
+  apiComplianceState.active = id;
+  renderApiCompliance(apiState.readiness || {});
+  document.body.scrollLeft = 0;
+  document.documentElement.scrollLeft = 0;
+}
+
+function renderApiCompliance(d) {
+  const tabs = document.getElementById('apiComplianceTabs');
+  const panel = document.getElementById('apiCompliancePanel');
+  const bottom = document.getElementById('apiComplianceBottom');
+  if (!tabs || !panel || !bottom) return;
+  const sections = d.complianceSections || [];
+  if (!sections.length) {
+    tabs.innerHTML = '';
+    panel.innerHTML = '<div style="color:var(--ink-dim);">Commercial section bilgisi henuz hazir degil.</div>';
+    bottom.innerHTML = '';
+    return;
+  }
+  if (!sections.some(s => s.id === apiComplianceState.active)) apiComplianceState.active = sections[0].id;
+  const active = sections.find(s => s.id === apiComplianceState.active) || sections[0];
+  tabs.innerHTML = sections.map(s => `
+    <button class="api-tab ${s.id === active.id ? 'active' : ''}" onclick="setApiComplianceTab('${s.id}')">${supplyEsc(s.tab || s.title)}</button>
+  `).join('');
+  panel.innerHTML = `
+    <div>
+      <div class="api-tab-kicker">${supplyEsc(active.kicker || '')}</div>
+      <div class="api-tab-title">${supplyEsc(active.title || '')}</div>
+      <div class="api-tab-body">${supplyEsc(active.body || '')}</div>
+    </div>
+    <div class="api-tab-list">
+      ${(active.bullets || []).map(b => `<div class="item">${supplyEsc(b)}</div>`).join('')}
+    </div>
+  `;
+  bottom.innerHTML = [
+    ['Trademark', d.disclaimer || ''],
+    ['Support', d.supportEmail ? `Seller support: ${d.supportEmail}` : 'Support page is available.'],
+    ['Public pages', (d.requiredPages || []).map(p => p.pathname).join(' | ')],
+  ].map(([k, v]) => `<div class="note"><strong>${supplyEsc(k)}</strong><span>${supplyEsc(v)}</span></div>`).join('');
+}
+
 async function loadApiPanel(force = false) {
   if (apiState.loaded && !force) { renderApiPanel(); return; }
   try {
     const r = await fetch('/api/etsy/commercial-readiness');
     apiState.readiness = await r.json();
+    applyToolGate(apiState.readiness);
     apiState.loaded = true;
     renderApiPanel();
     loadEtsyOperations();
@@ -4237,7 +4444,7 @@ function renderApiPanel() {
   const checks = d.checks || [];
   document.getElementById('apiReadySummary').textContent = d.ready
     ? 'Commercial access basvurusu icin temel kosullar hazir gorunuyor.'
-    : 'Eksik alanlar var. Ozellikle HTTPS redirect URI, OAuth token ve shop id kontrol edilmeli.';
+    : 'Eksik alanlar var. Ozellikle OAuth redirect URI, OAuth token ve shop id kontrol edilmeli.';
   document.getElementById('apiChecklist').innerHTML = checks.map(c => `
     <div class="api-check ${c.ok ? 'ok' : ''}">
       <span class="mark">${c.ok ? 'OK' : '!'}</span>
@@ -4260,6 +4467,14 @@ function renderApiPanel() {
   ).join('');
   document.getElementById('apiDisclaimer').textContent = d.disclaimer || '';
   document.getElementById('apiScopes').innerHTML = (d.scopes || []).map(s => `<span>${supplyEsc(s)}</span>`).join('');
+  const detail = d.toolDetail || {};
+  const detailEl = document.getElementById('apiToolDetail');
+  if (detailEl) {
+    detailEl.textContent = detail.name
+      ? `${detail.name}: ${detail.placement}. ${detail.purpose}`
+      : 'Commercial application detail hazir.';
+  }
+  renderApiCompliance(d);
 }
 async function loadEtsyOperations() {
   const el = document.getElementById('apiOpsSnapshot');
@@ -4311,7 +4526,7 @@ async function refreshEtsyOAuth() {
   } catch (err) { toast('Token yenilenemedi: ' + err.message); }
 }
 
-const supplyState = { loaded: false, products: [], selectedId: null, store: null, orders: [] };
+const supplyState = { loaded: false, products: [], services: [], channels: [], workflows: [], qualityChecks: [], selectedId: null, store: null, orders: [] };
 function supplyEsc(value) {
   return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 }
@@ -4329,12 +4544,19 @@ async function loadSupplyPanel(force = false) {
     const catalog = await catalogRes.json();
     const orders = await ordersRes.json();
     supplyState.products = catalog.products || [];
+    supplyState.services = catalog.services || [];
+    supplyState.channels = catalog.channels || [];
+    supplyState.workflows = catalog.workflows || [];
+    supplyState.qualityChecks = catalog.qualityChecks || [];
     supplyState.store = catalog.store || {};
     supplyState.orders = orders.jobs || [];
     supplyState.loaded = true;
     document.getElementById('supplyStatProducts').textContent = String(supplyState.products.length || 0);
     document.getElementById('supplyStatCountries').textContent = String(catalog.countries || '220+');
+    const ch = document.getElementById('supplyStatChannels');
+    if (ch) ch.textContent = String(supplyState.channels.length || 0);
     if (!supplyState.selectedId && supplyState.products[0]) supplyState.selectedId = supplyState.products[0].id;
+    renderSupplyServices();
     renderSupplyCatalog();
     renderSupplyStore();
     renderFulfillmentSteps();
@@ -4343,6 +4565,21 @@ async function loadSupplyPanel(force = false) {
     const grid = document.getElementById('supplyCatalog');
     if (grid) grid.innerHTML = '<div style="grid-column:1/-1; color:var(--red); padding:1rem;">Tedarik paneli yuklenemedi: ' + supplyEsc(err.message) + '</div>';
   }
+}
+function renderSupplyServices() {
+  const el = document.getElementById('supplyServices');
+  if (!el) return;
+  const services = supplyState.services || [];
+  if (!services.length) {
+    el.innerHTML = '<div style="color:var(--ink-dim);">Servis modulu bulunamadi.</div>';
+    return;
+  }
+  el.innerHTML = services.map(s => `
+    <div class="service-card">
+      <strong>${supplyEsc(s.title)}</strong>
+      <span>${supplyEsc(s.desc)}</span>
+    </div>
+  `).join('');
 }
 function renderSupplyCatalog() {
   const grid = document.getElementById('supplyCatalog');
@@ -5027,7 +5264,7 @@ async function usePuzzleAlternative() {
       window._puzzleListingPrefill = puzzleState.currentListing;
     }
     toast('Taslak hazir — mockup adimina geciyoruz');
-    goView('wizard');
+    await goView('wizard');
     // Force-skip the upload step: the design is already in state.ref.
     try {
       if (typeof state !== 'undefined') {

@@ -702,8 +702,21 @@ app.get('/', (req, res) => sendNoStoreHtml(res, 'baby-puzzle.html'));
 app.get('/baby-puzzle', (req, res) => sendNoStoreHtml(res, 'baby-puzzle.html'));
 app.get('/legacy', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-const LEGAL_DISCLAIMER = 'The term "Etsy" is a trademark of Etsy, Inc. EtsyOkulu Product Creator uses Etsy\'s API, but is not affiliated with, endorsed by, sponsored by, or certified by Etsy.';
+const TOOL_SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || 'support@etsyokulu.com';
+const LEGAL_DISCLAIMER = 'Etsy is a registered trademark of Etsy, Inc. EtsyOkulu Product Creator uses Etsy\'s API but is not endorsed, certified, sponsored by, or affiliated with Etsy, Inc.';
 const LEGAL_PAGES = {
+  '/commercial-application': {
+    title: 'Commercial Application Detail',
+    kicker: 'Etsy review summary',
+    body: 'EtsyOkulu Product Creator is a seller operations tool opened from EtsyOkulu Tools as a separate Product Creator workspace. It helps authorized Etsy sellers prepare draft listings, compliant product media, fulfillment files, pricing checks, order context, and shipping workflow notes after the seller connects an Etsy shop with OAuth.',
+    bullets: [
+      'Primary users are Etsy sellers who authorize their own shop through Etsy OAuth; the tool does not collect Etsy passwords.',
+      'Core API use: read shop context, read shop sections, create or update draft listings, read sales/order context for fulfillment, and align shipping/tracking operations.',
+      'The application is draft-first: sellers review generated titles, tags, descriptions, media, pricing, production files, and policy fit before publishing.',
+      'The application displays the Etsy trademark disclaimer and keeps Etsy branding less prominent than the application branding.',
+      `Seller support is available through ${TOOL_SUPPORT_EMAIL}; security concerns are escalated promptly and credentials are rotated when needed.`,
+    ],
+  },
   '/connect-etsy': {
     title: 'Connect Etsy',
     kicker: 'OAuth connection',
@@ -713,6 +726,7 @@ const LEGAL_PAGES = {
       'Listings are created as drafts by default so the seller reviews before publishing.',
       'Sellers can revoke access in this tool or from Etsy connected apps.',
       'Required scopes: shops_r, listings_r, listings_w, transactions_r, transactions_w.',
+      'The exact redirect URI must use HTTPS and match the callback URL registered in Etsy developer settings.',
     ],
   },
   '/integrations': {
@@ -724,6 +738,7 @@ const LEGAL_PAGES = {
       'Buyer order and address data is used only for fulfillment, support, security, and legal compliance.',
       'API calls are cached where appropriate and rate-limit headers are respected.',
       'Commercial access readiness depends on Etsy developer approval.',
+      'The tool requests only the scopes needed for seller listing, shop, transaction, and fulfillment workflows.',
     ],
   },
   '/terms': {
@@ -735,6 +750,7 @@ const LEGAL_PAGES = {
       'Do not use the tool for fraud, spam, IP infringement, scraping, or Etsy policy bypassing.',
       'Etsy API availability, scopes, limits, and approval are controlled by Etsy.',
       'The tool provides drafts and operational assistance, not legal, tax, or Etsy support advice.',
+      'Users must accept these application terms before using connected Etsy API operations.',
     ],
   },
   '/privacy': {
@@ -746,6 +762,7 @@ const LEGAL_PAGES = {
       'OAuth tokens and app secrets must be stored outside source control and protected in environment variables.',
       'Cached Etsy data is deleted after disconnect or when no longer needed for the workflow.',
       'Data breach concerns should be handled promptly and escalated to Etsy and affected sellers where required.',
+      'Etsy member personal information is processed only as needed for the seller workflow and is not sold or transferred.',
     ],
   },
   '/data-deletion': {
@@ -768,6 +785,18 @@ const LEGAL_PAGES = {
       'API keys, shared secrets, access tokens, and refresh tokens must not be committed to git.',
       'Rate limits and retry-after responses should be respected for every Etsy API operation.',
       'No screen scraping is required for approved Etsy API operations.',
+      'The application blocks Product Creator actions until API key, HTTPS redirect, OAuth token, and shop id are configured.',
+    ],
+  },
+  '/support': {
+    title: 'Support',
+    kicker: 'Seller support',
+    body: 'Etsy sellers using EtsyOkulu Product Creator can request help with account connection, OAuth scopes, draft listing workflow, fulfillment files, data deletion, and security concerns.',
+    bullets: [
+      `Monitored support contact: ${TOOL_SUPPORT_EMAIL}.`,
+      'Security and credential concerns should include the shop name, approximate time, and affected workflow; never send raw access tokens by email.',
+      'Operational bugs are handled through reproduction steps, affected SKU/job id, and browser/server logs where available.',
+      'Commercial API review questions can reference the Commercial Application Detail, Terms, Privacy, Data Deletion, Security, and Copyright pages.',
     ],
   },
   '/copyright': {
@@ -783,10 +812,138 @@ const LEGAL_PAGES = {
   },
 };
 
+const COMMERCIAL_REVIEW_SECTIONS = [
+  {
+    id: 'tool-detail',
+    tab: 'Tool Detail',
+    title: 'EtsyOkulu Product Creator',
+    kicker: 'Separate EtsyOkulu tool',
+    body: 'EtsyOkulu Product Creator is presented as its own tool workspace opened from EtsyOkulu Tools. The tool is not a general landing page; it is a seller operations surface for preparing Etsy-ready product media, draft listings, pricing, fulfillment files, and order workflow context after a seller connects their own Etsy shop.',
+    bullets: [
+      'The tool is visually separated from EtsyOkulu school/course pages and appears as a dedicated Product Creator workspace.',
+      'The first screen shows API readiness and keeps production actions locked until Etsy API connection is complete.',
+      'The workflow is draft-first: sellers review generated output before publishing on Etsy.',
+      'Generated assets remain tied to the seller SKU/job and can be cleaned from the operations panel.',
+    ],
+  },
+  {
+    id: 'etsy-api-use',
+    tab: 'Etsy API Use',
+    title: 'Official Etsy Open API operations',
+    kicker: 'Commercial API purpose',
+    body: 'The application uses Etsy Open API access only for seller-authorized shop operations. It is not a marketplace replacement, checkout bypass, scraping product, password collector, or buyer data enrichment product.',
+    bullets: [
+      'Read shop context, shop sections, listings, sales/order context, and shipping profile references.',
+      'Create or update draft listing data only after seller authorization.',
+      'Use order and shipping data only for fulfillment, support, security, and legal compliance.',
+      'Respect Etsy API availability, approval, rate limits, token revocation, and scope boundaries.',
+    ],
+  },
+  {
+    id: 'oauth-scopes',
+    tab: 'OAuth & Scopes',
+    title: 'OAuth connection and requested scopes',
+    kicker: 'Seller authorization',
+    body: 'Connection starts with Etsy OAuth 2.0 Authorization Code flow with PKCE. The seller authorizes on Etsy; this application never asks for or stores an Etsy password.',
+    bullets: [
+      'Required callback must be the exact HTTPS redirect URI registered in Etsy developer settings.',
+      'Default requested scopes: shops_r, listings_r, listings_w, transactions_r, transactions_w.',
+      'Access can be revoked from the application or from Etsy connected apps.',
+      'Refresh tokens are stored outside source control and rotated when a security concern exists.',
+    ],
+  },
+  {
+    id: 'data-privacy',
+    tab: 'Data',
+    title: 'Data handling and deletion',
+    kicker: 'Least necessary seller data',
+    body: 'Shop, listing, order, shipping, support, and operational data is used only for the seller workflow that the connected seller initiated.',
+    bullets: [
+      'Buyer/order data is not sold, transferred, enriched, or used for unrelated marketing.',
+      'Cached Etsy data is deleted after disconnect or when no longer needed for the workflow, unless legal/security retention is required.',
+      'Local generated files can be cleaned through Operations > Cleanup.',
+      'The public Data Deletion page explains disconnect, revoke, and purge behavior.',
+    ],
+  },
+  {
+    id: 'security-controls',
+    tab: 'Security',
+    title: 'Security controls',
+    kicker: 'Operational safeguards',
+    body: 'Product Creator is built around least-privilege API usage, token-based authorization, environment-based secrets, and locked production actions until required API settings are present.',
+    bullets: [
+      'API keys, shared secrets, access tokens, and refresh tokens must not be committed to git.',
+      'The UI and backend both block Product Creator operations until commercial readiness checks pass.',
+      'No Etsy screen scraping is required for approved API operations.',
+      'Security issues can be reported through the support page and escalated with affected shop/workflow details.',
+    ],
+  },
+  {
+    id: 'trademark',
+    tab: 'Trademark',
+    title: 'Etsy trademark and affiliation disclaimer',
+    kicker: 'Brand boundary',
+    body: LEGAL_DISCLAIMER,
+    bullets: [
+      'Etsy branding is used only to identify the integration target and seller workflow.',
+      'EtsyOkulu Product Creator is branded as EtsyOkulu, not as an Etsy-owned or Etsy-certified product.',
+      'The disclaimer is displayed on the tool/API page and all public compliance pages.',
+      'Etsy remains a separate platform with its own policies, developer review, and user terms.',
+    ],
+  },
+];
+
+function isAllowedOAuthRedirect(value) {
+  try {
+    const url = new URL(String(value || '').trim());
+    const host = url.hostname.toLowerCase();
+    if (url.protocol === 'https:') return true;
+    return url.protocol === 'http:' && host === 'localhost';
+  } catch {
+    return false;
+  }
+}
+
+function getCommercialReadiness() {
+  const status = getPublicEtsyApiStatus();
+  const requiredPages = ['/commercial-application', '/connect-etsy', '/integrations', '/terms', '/privacy', '/data-deletion', '/security', '/support', '/copyright'];
+  const redirectReady = isAllowedOAuthRedirect(status.redirectUri);
+  const checks = [
+    { id: 'api_key', label: 'Etsy keystring + shared secret configured', ok: !!status.apiKey },
+    { id: 'redirect', label: 'Exact OAuth redirect URI configured (HTTPS public or localhost dev)', ok: redirectReady },
+    { id: 'oauth', label: 'OAuth access token available', ok: !!status.accessToken },
+    { id: 'shop', label: 'Shop ID available', ok: !!status.shopId },
+    { id: 'tool_details', label: 'Commercial application detail page available', ok: true },
+    { id: 'terms', label: 'Terms, privacy, deletion, security, support and IP pages available', ok: true },
+    { id: 'trademark', label: 'Etsy registered trademark disclaimer displayed', ok: true },
+    { id: 'drafts', label: 'Listing workflow is draft-first', ok: true },
+    { id: 'support', label: `Monitored seller support contact configured (${TOOL_SUPPORT_EMAIL})`, ok: true },
+  ];
+  return {
+    ready: checks.every(c => c.ok),
+    status,
+    checks,
+    requiredPages,
+    missing: checks.filter(c => !c.ok),
+  };
+}
+
+function requireEtsyToolReady(req, res, next) {
+  const gate = getCommercialReadiness();
+  if (gate.ready) return next();
+  return res.status(403).json({
+    ok: false,
+    error: 'Etsy Product Creator is locked until Etsy API commercial readiness is complete.',
+    message: 'Configure Etsy keystring:shared_secret, an exact OAuth redirect URI, OAuth access token, and Shop ID before running Product Creator operations.',
+    missing: gate.missing.map(c => ({ id: c.id, label: c.label })),
+    status: gate.status,
+  });
+}
+
 function renderLegalPage(page) {
-  const links = ['/connect-etsy', '/integrations', '/terms', '/privacy', '/data-deletion', '/security', '/copyright'];
+  const links = ['/commercial-application', '/connect-etsy', '/integrations', '/terms', '/privacy', '/data-deletion', '/security', '/support', '/copyright'];
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${page.title} - EtsyOkulu Product Creator</title><style>
-body{margin:0;font-family:Inter,Arial,sans-serif;background:#f8f5ef;color:#231814}main{max-width:980px;margin:0 auto;padding:48px 20px}nav{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:34px}a{color:#9a4b1d}nav a{border:1px solid #e4d8ca;background:#fff;border-radius:999px;padding:8px 12px;text-decoration:none;font-weight:700;font-size:13px}section{background:#fff;border:1px solid #e4d8ca;border-radius:16px;padding:28px;box-shadow:0 8px 0 #ead9cc}.kicker{color:#a15220;text-transform:uppercase;font-size:12px;font-weight:800;letter-spacing:.08em}h1{font-size:42px;line-height:1.04;margin:8px 0 16px}p,li{font-size:15px;line-height:1.65;color:#5f5149}.cta{display:inline-flex;margin-top:16px;background:#d86922;color:#fff;border-radius:10px;padding:12px 16px;text-decoration:none;font-weight:800}.notice{margin-top:24px;border-left:3px solid #d86922;background:#fff8f0;padding:12px 14px;font-size:13px;color:#6f5d50}</style></head><body><main><nav><a href="/baby-puzzle">Tool</a>${links.map(h => `<a href="${h}">${LEGAL_PAGES[h].title}</a>`).join('')}</nav><section><div class="kicker">${page.kicker}</div><h1>${page.title}</h1><p>${page.body}</p><ul>${page.bullets.map(b => `<li>${b}</li>`).join('')}</ul>${page.title === 'Connect Etsy' ? '<a class="cta" href="/api/etsy/oauth/start">Start Etsy OAuth</a>' : ''}<p class="notice">${LEGAL_DISCLAIMER}</p></section></main></body></html>`;
+body{margin:0;font-family:Inter,Arial,sans-serif;background:#f6f7f9;color:#17202a}main{max-width:1040px;margin:0 auto;padding:42px 20px}nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px}a{color:#0f766e}nav a{border:1px solid #dce3ea;background:#fff;border-radius:8px;padding:8px 10px;text-decoration:none;font-weight:700;font-size:12px}section{background:#fff;border:1px solid #dce3ea;border-radius:8px;padding:28px;box-shadow:0 1px 2px rgba(26,23,20,.04)}.kicker{color:#0f766e;text-transform:uppercase;font-size:12px;font-weight:800;letter-spacing:.08em}h1{font-size:38px;line-height:1.06;margin:8px 0 16px}p,li{font-size:15px;line-height:1.65;color:#5e6a78}.cta{display:inline-flex;margin-top:16px;background:#0f766e;color:#fff;border-radius:8px;padding:12px 16px;text-decoration:none;font-weight:800}.notice{margin-top:24px;border-left:3px solid #0f766e;background:#edf1f5;padding:12px 14px;font-size:13px;color:#5e6a78}</style></head><body><main><nav><a href="/baby-puzzle">Tool</a>${links.map(h => `<a href="${h}">${LEGAL_PAGES[h].title}</a>`).join('')}</nav><section><div class="kicker">${page.kicker}</div><h1>${page.title}</h1><p>${page.body}</p><ul>${page.bullets.map(b => `<li>${b}</li>`).join('')}</ul>${page.title === 'Connect Etsy' ? '<a class="cta" href="/api/etsy/oauth/start">Start Etsy OAuth</a>' : ''}<p class="notice">${LEGAL_DISCLAIMER}</p></section></main></body></html>`;
 }
 
 for (const [route, page] of Object.entries(LEGAL_PAGES)) {
@@ -1040,26 +1197,37 @@ app.post('/api/settings', (req, res) => {
 });
 
 app.get('/api/etsy/commercial-readiness', (req, res) => {
-  const status = getPublicEtsyApiStatus();
+  const gate = getCommercialReadiness();
+  const status = gate.status;
   const origin = `${req.protocol}://${req.get('host')}`;
-  const requiredPages = ['/connect-etsy', '/integrations', '/terms', '/privacy', '/data-deletion', '/security', '/copyright'];
-  const checks = [
-    { id: 'api_key', label: 'Etsy keystring + shared secret configured', ok: !!status.apiKey },
-    { id: 'redirect', label: 'Exact HTTPS OAuth redirect URI configured', ok: !!status.redirectUri && /^https:\/\//i.test(status.redirectUri) },
-    { id: 'oauth', label: 'OAuth access token available', ok: !!status.accessToken },
-    { id: 'shop', label: 'Shop ID available', ok: !!status.shopId },
-    { id: 'terms', label: 'Terms, privacy, deletion, security and IP pages available', ok: true },
-    { id: 'trademark', label: 'Etsy trademark disclaimer displayed', ok: true },
-    { id: 'drafts', label: 'Listing workflow is draft-first', ok: true },
-  ];
   res.json({
-    ready: checks.every(c => c.ok),
+    ready: gate.ready,
     status,
-    checks,
-    requiredPages: requiredPages.map(pathname => ({ pathname, url: origin + pathname })),
+    checks: gate.checks,
+    missing: gate.missing,
+    requiredPages: gate.requiredPages.map(pathname => ({ pathname, url: origin + pathname })),
     callbackUrl: status.redirectUri || origin + '/oauth/etsy/callback',
     disclaimer: LEGAL_DISCLAIMER,
+    supportEmail: TOOL_SUPPORT_EMAIL,
     scopes: (status.scopes || '').split(/\s+/).filter(Boolean),
+    toolDetail: {
+      name: 'EtsyOkulu Product Creator',
+      placement: 'Separate tool tab opened from EtsyOkulu Tools',
+      purpose: 'Draft-first listing, media, fulfillment, pricing, and seller operations workspace for authorized Etsy sellers.',
+      dataUse: 'Shop, listing, order, shipping, and support data are used only for the connected seller workflow.',
+    },
+    complianceSections: COMMERCIAL_REVIEW_SECTIONS,
+  });
+});
+
+app.get('/api/etsy/tool-gate', (req, res) => {
+  const gate = getCommercialReadiness();
+  res.json({
+    ready: gate.ready,
+    missing: gate.missing,
+    status: gate.status,
+    disclaimer: LEGAL_DISCLAIMER,
+    supportEmail: TOOL_SUPPORT_EMAIL,
   });
 });
 
@@ -1155,7 +1323,7 @@ app.get('/api/mockups/thumb/:name', async (req, res) => {
   }
 });
 
-app.post('/api/mockups/upload', upload.array('mockups', 20), (req, res) => {
+app.post('/api/mockups/upload', requireEtsyToolReady, upload.array('mockups', 20), (req, res) => {
   const dir = path.join(__dirname, 'mockups');
   const saved = [];
   for (const file of req.files) {
@@ -1226,7 +1394,7 @@ app.get('/api/mockup-positions', (req, res) => {
   }
 });
 
-app.post('/api/mockup-positions', (req, res) => {
+app.post('/api/mockup-positions', requireEtsyToolReady, (req, res) => {
   try {
     const { template, x, y, w, h, width, height, rotation, source } = req.body;
     if (!template) return res.status(400).json({ error: 'template required' });
@@ -1320,7 +1488,7 @@ app.get('/api/calibrate/:template', async (req, res) => {
   }
 });
 
-app.post('/api/calibrate/batch-auto', async (req, res) => {
+app.post('/api/calibrate/batch-auto', requireEtsyToolReady, async (req, res) => {
   try {
     const templates = fs.readdirSync(MOCKUPS_DIR).filter(f => /\.(jpg|jpeg|png|webp|avif)$/i.test(f));
     let positions = {};
@@ -1354,7 +1522,7 @@ app.post('/api/calibrate/batch-auto', async (req, res) => {
   }
 });
 
-app.post('/api/calibrate/auto-single', async (req, res) => {
+app.post('/api/calibrate/auto-single', requireEtsyToolReady, async (req, res) => {
   try {
     const { template } = req.body;
     if (!template) return res.status(400).json({ error: 'template required' });
@@ -1377,7 +1545,7 @@ app.post('/api/calibrate/auto-single', async (req, res) => {
 });
 
 // ── Remove background from a design upload (returns PNG with alpha) ──
-app.post('/api/remove-bg', multer({ storage: multer.memoryStorage() }).single('design'), async (req, res) => {
+app.post('/api/remove-bg', requireEtsyToolReady, multer({ storage: multer.memoryStorage() }).single('design'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'design required' });
     const cleaned = await removeBackground(req.file.buffer);
@@ -1391,7 +1559,7 @@ app.post('/api/remove-bg', multer({ storage: multer.memoryStorage() }).single('d
 });
 
 // ── Calibration preview: compose design onto mockup with given position ──
-app.post('/api/calibrate/preview', multer({ storage: multer.memoryStorage() }).single('design'), async (req, res) => {
+app.post('/api/calibrate/preview', requireEtsyToolReady, multer({ storage: multer.memoryStorage() }).single('design'), async (req, res) => {
   try {
     const sharp = require('sharp');
     const tpl = req.body.template;
@@ -1446,6 +1614,7 @@ app.post('/api/calibrate/preview', multer({ storage: multer.memoryStorage() }).s
 
 // ── Regenerate a single mockup ──
 app.post('/api/regenerate-mockup',
+  requireEtsyToolReady,
   upload.fields([
     { name: 'design', maxCount: 1 },
     { name: 'backDesign', maxCount: 1 },
@@ -1524,7 +1693,7 @@ app.post('/api/regenerate-mockup',
 );
 
 // ── Generate tags with AI ──
-app.post('/api/generate-tags-ai', async (req, res) => {
+app.post('/api/generate-tags-ai', requireEtsyToolReady, async (req, res) => {
   try {
     const { title, tags: existingTags } = req.body;
     const apiKey = req.apiKey;
@@ -1573,7 +1742,7 @@ Output ONLY a JSON array of 13 strings, nothing else. Example: ["tag1","tag2",..
 });
 
 // ── Generate title with AI ──
-app.post('/api/generate-title-ai', async (req, res) => {
+app.post('/api/generate-title-ai', requireEtsyToolReady, async (req, res) => {
   try {
     const { title, tags } = req.body;
     const newTitle = await generateSEOTitle(title || '', tags || [], req.apiKey);
@@ -1584,7 +1753,7 @@ app.post('/api/generate-title-ai', async (req, res) => {
 });
 
 // ── Generate description with template ──
-app.post('/api/generate-description-ai', async (req, res) => {
+app.post('/api/generate-description-ai', requireEtsyToolReady, async (req, res) => {
   try {
     const { title, tags } = req.body;
     const description = generateDescription(title || '', tags || []);
@@ -1595,7 +1764,7 @@ app.post('/api/generate-description-ai', async (req, res) => {
 });
 
 // Convert a mockup image to a 5-second Ken Burns MP4 video for Etsy listings
-app.post('/api/mockup-to-video', express.json(), async (req, res) => {
+app.post('/api/mockup-to-video', requireEtsyToolReady, express.json(), async (req, res) => {
   try {
     const { src } = req.body || {};
     if (!src || typeof src !== 'string') return res.status(400).json({ error: 'src required' });
@@ -1641,6 +1810,7 @@ app.post('/api/mockup-to-video', express.json(), async (req, res) => {
 
 // Main pipeline endpoint — SSE response
 app.post('/api/create',
+  requireEtsyToolReady,
   upload.fields([
     { name: 'ref', maxCount: 1 },
     { name: 'backDesign', maxCount: 1 },
@@ -2898,7 +3068,7 @@ app.get('/api/job/:sku', (req, res) => {
   res.json(job);
 });
 
-app.post('/api/job/:sku/resume', (req, res) => {
+app.post('/api/job/:sku/resume', requireEtsyToolReady, (req, res) => {
   const job = readJob(req.params.sku);
   if (!job) return res.status(404).json({ error: 'Job not found' });
   if (job.status !== 'interrupted' && job.status !== 'paused' && job.status !== 'failed') {
@@ -2993,7 +3163,7 @@ async function composeOneMockupForJob(sku, designAbsPath, mockupTplAbsPath, outp
 }
 
 // Replace mockup at a given index
-app.put('/api/job/:sku/mockup/:index', async (req, res) => {
+app.put('/api/job/:sku/mockup/:index', requireEtsyToolReady, async (req, res) => {
   try {
     const { sku } = req.params;
     const idx = parseInt(req.params.index);
@@ -3021,7 +3191,7 @@ app.put('/api/job/:sku/mockup/:index', async (req, res) => {
 });
 
 // Append a new mockup
-app.post('/api/job/:sku/mockup', async (req, res) => {
+app.post('/api/job/:sku/mockup', requireEtsyToolReady, async (req, res) => {
   try {
     const { sku } = req.params;
     const { mockupTemplatePath } = req.body;
@@ -3108,7 +3278,7 @@ app.get('/api/job/:sku/batch', (req, res) => {
 // ── Batch CRUD ──
 const BATCHES_DIR = path.join(__dirname, 'data', 'batches');
 
-app.post('/api/batch', (req, res) => {
+app.post('/api/batch', requireEtsyToolReady, (req, res) => {
   const batchId = 'batch-' + Date.now();
   const batch = { batchId, createdAt: new Date().toISOString(), items: [] };
   fs.writeFileSync(path.join(BATCHES_DIR, batchId + '.json'), JSON.stringify(batch, null, 2));
@@ -3267,12 +3437,12 @@ app.get('/api/presets', (req, res) => {
   res.json(list);
 });
 
-app.post('/api/presets', (req, res) => {
+app.post('/api/presets', requireEtsyToolReady, (req, res) => {
   const preset = createPreset(req.body);
   res.json(preset);
 });
 
-app.put('/api/presets/:id', (req, res) => {
+app.put('/api/presets/:id', requireEtsyToolReady, (req, res) => {
   const result = updatePreset(req.params.id, req.body);
   if (!result) return res.status(404).json({ error: 'Preset not found' });
   res.json(result);
@@ -3283,7 +3453,7 @@ app.delete('/api/presets/:id', (req, res) => {
   else res.status(404).json({ error: 'Preset not found' });
 });
 
-app.post('/api/presets/:id/use', (req, res) => {
+app.post('/api/presets/:id/use', requireEtsyToolReady, (req, res) => {
   markPresetUsed(req.params.id);
   const preset = getPreset(req.params.id);
   if (!preset) return res.status(404).json({ error: 'Preset not found' });
@@ -3291,7 +3461,7 @@ app.post('/api/presets/:id/use', (req, res) => {
 });
 
 // ── Mockup Favorites ──
-app.post('/api/mockups/favorite', (req, res) => {
+app.post('/api/mockups/favorite', requireEtsyToolReady, (req, res) => {
   const { name, favorite } = req.body;
   if (!name) return res.status(400).json({ error: 'name required' });
   toggleMockupFavorite(name, !!favorite);
@@ -3307,7 +3477,7 @@ app.get('/api/mockups/stats', (req, res) => {
 });
 
 // ── Quality Control ──
-app.post('/api/qc/:sku', async (req, res) => {
+app.post('/api/qc/:sku', requireEtsyToolReady, async (req, res) => {
   try {
     const preset = req.body.preset || null;
     const result = await runQualityCheck(req.params.sku, preset);
@@ -3325,7 +3495,7 @@ app.get('/api/qc/:sku', (req, res) => {
 });
 
 // ── Content Variations ──
-app.post('/api/generate-variations', async (req, res) => {
+app.post('/api/generate-variations', requireEtsyToolReady, async (req, res) => {
   try {
     const { title, tags, style } = req.body;
     const result = await generateContentVariations(title || '', tags || [], req.apiKey, style || 'broad');
@@ -3545,7 +3715,7 @@ async function runOpsApiAction(action, send) {
       ['OAuth access token', !!status.accessToken, status.accessToken || 'Eksik'],
       ['Refresh token', !!status.refreshToken, status.refreshToken || 'Eksik'],
       ['Shop ID', !!status.shopId, status.shopId || 'Eksik'],
-      ['HTTPS redirect URI', !!status.redirectUri && /^https:\/\//i.test(status.redirectUri), status.redirectUri || 'Eksik'],
+      ['OAuth redirect URI', isAllowedOAuthRedirect(status.redirectUri), status.redirectUri || 'Eksik'],
     ];
     send('stdout', { line: 'Commercial access hazirlik kontrolu\n' });
     for (const [label, ok, value] of checks) {
@@ -3802,6 +3972,109 @@ const SUPPLY_CATALOG = [
     platforms: ['Etsy', 'Amazon'],
     tags: ['montessori shelf', 'playroom', 'storage'],
   },
+  {
+    id: 'personalized-wall-art',
+    category: 'Wall decor',
+    title: 'Personalized nursery wall art set',
+    supplierType: 'fine art print + frame partner',
+    productionDays: '2-5',
+    recommendedPrice: 74,
+    cost: 21,
+    shipping: 9,
+    platforms: ['Etsy', 'Amazon', 'Shopify'],
+    tags: ['nursery art', 'wall decor', 'personalized'],
+  },
+  {
+    id: 'custom-name-sign',
+    category: 'Wood decor',
+    title: 'Custom wooden nursery name sign',
+    supplierType: 'CNC wood cut + hand finish',
+    productionDays: '4-8',
+    recommendedPrice: 89,
+    cost: 31,
+    shipping: 14,
+    platforms: ['Etsy', 'Amazon'],
+    tags: ['name sign', 'nursery decor', 'wood sign'],
+  },
+  {
+    id: 'sensory-play-kit',
+    category: 'Educational toys',
+    title: 'Montessori sensory play kit',
+    supplierType: 'assembled toy kit + branded packaging',
+    productionDays: '3-6',
+    recommendedPrice: 58,
+    cost: 19,
+    shipping: 10,
+    platforms: ['Etsy', 'Amazon', 'TikTok Shop'],
+    tags: ['sensory kit', 'montessori toy', 'toddler gift'],
+  },
+  {
+    id: 'kids-floor-bed',
+    category: 'Kids furniture',
+    title: 'Montessori kids floor bed frame',
+    supplierType: 'flat pack wood furniture',
+    productionDays: '8-15',
+    recommendedPrice: 389,
+    cost: 184,
+    shipping: 62,
+    platforms: ['Etsy', 'Amazon'],
+    tags: ['floor bed', 'montessori bed', 'kids room'],
+  },
+  {
+    id: 'wooden-balance-board',
+    category: 'Montessori play',
+    title: 'Wooden toddler balance board',
+    supplierType: 'bent wood workshop',
+    productionDays: '4-7',
+    recommendedPrice: 96,
+    cost: 38,
+    shipping: 16,
+    platforms: ['Etsy', 'Amazon'],
+    tags: ['balance board', 'toddler toy', 'wooden toy'],
+  },
+];
+
+const REXVEN_SERVICE_STACK = [
+  {
+    id: 'catalog-research',
+    title: 'Product catalog and niche research',
+    desc: 'SKU ideas, product families, supplier fit, margin bands, and marketplace channel fit.',
+  },
+  {
+    id: 'mockup-content',
+    title: 'Mockup and listing content',
+    desc: 'Product media, lifestyle mockups, Etsy title, 13 varied tags, descriptions, and alt-text support.',
+  },
+  {
+    id: 'supplier-files',
+    title: 'Supplier file export',
+    desc: 'Production PDF/DXF/image outputs, personalization notes, material specs, and order handoff data.',
+  },
+  {
+    id: 'pod-fulfillment',
+    title: 'Sell-first fulfillment',
+    desc: 'Order intake, production queue, shipping cost planning, tracking sync, and exception handling.',
+  },
+  {
+    id: 'profit-pricing',
+    title: 'Profit and pricing calculator',
+    desc: 'Etsy fee, payment fee, listing fee, ad spend, shipping, break-even price, and margin estimate.',
+  },
+  {
+    id: 'quality-control',
+    title: 'Quality control',
+    desc: 'Draft-first review, IP/trademark checks, image completeness, supplier readiness, and listing QA.',
+  },
+  {
+    id: 'channel-expansion',
+    title: 'Channel expansion',
+    desc: 'Etsy-first workflow with Amazon, Shopify, Pinterest, and TikTok Shop preparation fields.',
+  },
+  {
+    id: 'support-compliance',
+    title: 'Support and compliance',
+    desc: 'Commercial API review pages, trademark disclaimer, support contact, privacy, data deletion, and security controls.',
+  },
 ];
 
 function numberOrDefault(value, fallback) {
@@ -3841,8 +4114,27 @@ app.get('/api/rexven/catalog', (req, res) => {
   res.json({
     products: SUPPLY_CATALOG,
     categories,
+    services: REXVEN_SERVICE_STACK,
     countries: 220,
     model: 'sell first, produce after order',
+    channels: ['Etsy', 'Amazon', 'Shopify', 'Pinterest', 'TikTok Shop'],
+    workflows: [
+      'Catalog research',
+      'Mockup and listing generation',
+      'Commercial API compliance',
+      'Supplier production file export',
+      'Profit and fee calculation',
+      'Order and fulfillment handoff',
+      'Tracking and support operations',
+      'Quality/IP review before publishing',
+    ],
+    qualityChecks: [
+      'Draft-first listing review',
+      'Trademark and IP risk review',
+      'Production file completeness',
+      'Shipping profile and margin check',
+      'Buyer data minimization',
+    ],
     store: getPublicEtsyApiStatus(),
   });
 });
@@ -3881,7 +4173,7 @@ app.get('/api/puzzle-themes', (req, res) => {
   }
 });
 
-app.post('/api/puzzle-alternatives', express.json(), async (req, res) => {
+app.post('/api/puzzle-alternatives', requireEtsyToolReady, express.json(), async (req, res) => {
   const { themeId, childName, sku } = req.body || {};
   if (!themeId) return res.status(400).json({ error: 'themeId zorunlu' });
   const useSku = sku || `draft-${Date.now()}`;
@@ -3904,7 +4196,7 @@ app.post('/api/puzzle-alternatives', express.json(), async (req, res) => {
   }
 });
 
-app.post('/api/puzzle-supplier-export', express.json(), async (req, res) => {
+app.post('/api/puzzle-supplier-export', requireEtsyToolReady, express.json(), async (req, res) => {
   const { themeId, sku, styleId, childName } = req.body || {};
   if (!themeId || !sku || !styleId) return res.status(400).json({ error: 'themeId, sku, styleId zorunlu' });
   try {
@@ -3934,7 +4226,7 @@ app.post('/api/puzzle-supplier-export', express.json(), async (req, res) => {
   }
 });
 
-app.post('/api/puzzle-select', express.json(), (req, res) => {
+app.post('/api/puzzle-select', requireEtsyToolReady, express.json(), (req, res) => {
   const { themeId, sku, styleId } = req.body || {};
   if (!themeId || !sku || !styleId) return res.status(400).json({ error: 'themeId, sku, styleId zorunlu' });
   try {
